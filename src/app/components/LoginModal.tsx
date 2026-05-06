@@ -58,6 +58,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setName('');
         setEmail('');
         setPassword('');
+        // Chuyển sang xác thực email sau khi đăng ký thành công
+        setSuccessMessage('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
         onClose();
       }
     } catch (err) {
@@ -311,16 +313,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 : 'Đăng ký'}
             </button>
 
-            <div className="relative my-6">
+            {/* <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">Hoặc</span>
               </div>
-            </div>
+            </div> */}
 
-            <div className="space-y-3">
+            {/* <div className="space-y-3">
               <button
                 type="button"
                 className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors"
@@ -343,7 +345,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 />
                 <span className="font-medium text-gray-700">Tiếp tục với Facebook</span>
               </button>
-            </div>
+            </div> */}
 
             <div className="text-center text-sm text-gray-600 mt-6">
               {isLoginMode ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}

@@ -25,8 +25,8 @@ export function RegisterPage() {
     setLoading(true);
     try {
       await register(name, email, password);
-      // Chuyển về trang chủ sau khi đăng ký (và context sẽ có token/user)
-      navigate('/');
+      // Navigate to verify email page
+      navigate('/verify-email', { state: { email } });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Đăng ký thất bại. Bạn vui lòng thử lại.');
     } finally {

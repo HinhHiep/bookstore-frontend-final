@@ -14,6 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  verifyEmail: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -55,10 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string) => {
     const response = await api.post('/auth/register', { name, email, password });
-    const { accessToken, refreshToken, user: userData } = response.data.data;
+    // No tokens returned, just message
+    return response.data;
+  };
+
+  const verifyEmail = async (email: string, otp: string) => {
+    const response = await api.post('/auth/verify-email', { email, otp });
+    const { accessToken, user: userData } = response.data.data;
     
     localStorage.setItem('accessToken', accessToken);
-    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     
     setUser(userData);
   };
@@ -88,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
+        verifyEmail,
         logout,
         updateUser,
       }}

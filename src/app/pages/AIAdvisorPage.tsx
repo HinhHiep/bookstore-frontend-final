@@ -15,13 +15,15 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import api from '../utils/api';
 
 interface Message {
-  id: number;
+  id: number | string;
   type: 'user' | 'ai';
   text: string;
   books?: Array<{
-    id: number;
+    id: string;
+    bookId?: string;
     title: string;
     author: string;
     price: string;
@@ -32,6 +34,7 @@ interface Message {
 }
 
 export function AIAdvisorPage() {
+  const [chatId, setChatId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const [messages, setMessages] = useState<Message[]>([
@@ -67,137 +70,10 @@ export function AIAdvisorPage() {
     },
   ];
 
-  const getAIResponse = (userMessage: string): Message => {
-    // Simulate AI response with book recommendations
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('bán chạy') || lowerMessage.includes('phổ biến')) {
-      return {
-        id: Date.now(),
-        type: 'ai',
-        text: 'Dựa trên yêu cầu của bạn về sách bán chạy, tôi gợi ý những cuốn sách sau đây đang được độc giả yêu thích nhất:',
-        books: [
-          {
-            id: 1,
-            title: 'Atomic Habits',
-            author: 'James Clear',
-            price: '129.000đ',
-            image: 'https://images.unsplash.com/photo-1546913760-e23d946dd386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWxmJTIwaGVscCUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.8,
-            reason: 'Cuốn sách #1 về xây dựng thói quen tích cực, đã bán hơn 15,000 cuốn',
-          },
-          {
-            id: 2,
-            title: 'The Psychology of Money',
-            author: 'Morgan Housel',
-            price: '149.000đ',
-            image: 'https://images.unsplash.com/photo-1768991732235-ac3e1bc9259c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGJvb2slMjBoYXJkY292ZXJ8ZW58MXx8fHwxNzczODIyMjA1fDA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.9,
-            reason: 'Hiểu về tâm lý và cách quản lý tài chính cá nhân hiệu quả',
-          },
-          {
-            id: 3,
-            title: 'Sapiens',
-            author: 'Yuval Noah Harari',
-            price: '189.000đ',
-            image: 'https://images.unsplash.com/photo-1768224946689-b599f1d406f0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwb3B1bGFyJTIwYm9va3MlMjBzdGFja3xlbnwxfHx8fDE3NzM4NDkzMjJ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.7,
-            reason: 'Khám phá lịch sử loài người từ góc nhìn độc đáo và sâu sắc',
-          },
-        ],
-      };
-    } else if (lowerMessage.includes('phát triển') || lowerMessage.includes('bản thân')) {
-      return {
-        id: Date.now(),
-        type: 'ai',
-        text: 'Tuyệt vời! Đây là những cuốn sách phát triển bản thân mà tôi đề xuất cho bạn:',
-        books: [
-          {
-            id: 4,
-            title: 'Thinking, Fast and Slow',
-            author: 'Daniel Kahneman',
-            price: '169.000đ',
-            image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwY292ZXJ8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.6,
-            reason: 'Hiểu về cách bộ não hoạt động và đưa ra quyết định tốt hơn',
-          },
-          {
-            id: 5,
-            title: 'The 7 Habits',
-            author: 'Stephen Covey',
-            price: '139.000đ',
-            image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwcmVhZGluZ3xlbnwxfHx8fDE3NzM4NDcwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.7,
-            reason: '7 thói quen giúp bạn trở nên hiệu quả hơn trong cuộc sống',
-          },
-        ],
-      };
-    } else if (lowerMessage.includes('lãng mạn') || lowerMessage.includes('tình yêu') || lowerMessage.includes('tiểu thuyết')) {
-      return {
-        id: Date.now(),
-        type: 'ai',
-        text: 'Tôi hiểu bạn đang tìm kiếm những câu chuyện lãng mạn cảm động. Đây là gợi ý của tôi:',
-        books: [
-          {
-            id: 6,
-            title: 'Tomorrow, and Tomorrow, and Tomorrow',
-            author: 'Gabrielle Zevin',
-            price: '189.000đ',
-            image: 'https://images.unsplash.com/photo-1765375382583-1344a5273849?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuZXclMjBib29rcyUyMHJlbGVhc2UlMjBkaXNwbGF5fGVufDF8fHx8MTc3Mzg1MDYzM3ww&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.9,
-            reason: 'Câu chuyện tình bạn và tình yêu đan xen trong thế giới game',
-          },
-          {
-            id: 7,
-            title: 'The Heaven & Earth Grocery Store',
-            author: 'James McBride',
-            price: '169.000đ',
-            image: 'https://images.unsplash.com/photo-1764923753986-c3f564e295d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rc3RvcmUlMjBuZXclMjBhcnJpdmFsc3xlbnwxfHx8fDE3NzM4NTA2MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.7,
-            reason: 'Khám phá tình yêu và sự hy sinh qua những nhân vật đầy cảm xúc',
-          },
-        ],
-      };
-    } else if (lowerMessage.includes('kinh doanh') || lowerMessage.includes('khởi nghiệp') || lowerMessage.includes('startup')) {
-      return {
-        id: Date.now(),
-        type: 'ai',
-        text: 'Hoàn hảo! Đây là những cuốn sách kinh doanh và khởi nghiệp bạn nên đọc:',
-        books: [
-          {
-            id: 8,
-            title: 'Rich Dad Poor Dad',
-            author: 'Robert Kiyosaki',
-            price: '119.000đ',
-            image: 'https://images.unsplash.com/photo-1592496431122-2349e0fbc666?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaW5hbmNlJTIwYm9va3xlbnwxfHx8fDE3NzM4NDcwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.5,
-            reason: 'Nền tảng tư duy tài chính cho mọi doanh nhân',
-          },
-          {
-            id: 9,
-            title: 'The Psychology of Money',
-            author: 'Morgan Housel',
-            price: '149.000đ',
-            image: 'https://images.unsplash.com/photo-1768991732235-ac3e1bc9259c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGJvb2slMjBoYXJkY292ZXJ8ZW58MXx8fHwxNzczODIyMjA1fDA&ixlib=rb-4.1.0&q=80&w=1080',
-            rating: 4.9,
-            reason: 'Hiểu rõ tâm lý để quản lý tiền bạc thông minh',
-          },
-        ],
-      };
-    } else {
-      return {
-        id: Date.now(),
-        type: 'ai',
-        text: 'Cảm ơn bạn đã chia sẻ! Để tôi có thể gợi ý chính xác hơn, bạn có thể cho tôi biết thêm về:\n\n• Thể loại sách bạn yêu thích (văn học, kinh tế, kỹ năng, thiếu nhi...)\n• Mục đích đọc sách (giải trí, học hỏi, phát triển bản thân...)\n• Tác giả hoặc cuốn sách nào bạn từng đọc và thích\n\nHoặc bạn có thể chọn một trong các câu hỏi gợi ý bên dưới! 😊',
-      };
-    }
-  };
-
-  const handleSendMessage = (text?: string) => {
+  const handleSendMessage = async (text?: string) => {
     const messageText = text || inputValue.trim();
     if (!messageText) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now(),
       type: 'user',
@@ -208,12 +84,45 @@ export function AIAdvisorPage() {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI typing delay
-    setTimeout(() => {
-      const aiResponse = getAIResponse(messageText);
-      setMessages((prev) => [...prev, aiResponse]);
+    try {
+      const response = await api.post('/chatbot', {
+        message: messageText,
+        chatId,
+      });
+
+      const result = response.data?.data;
+      const books = Array.isArray(result?.books) ? result.books : [];
+
+      const aiMessage: Message = {
+        id: `${Date.now()}-ai`,
+        type: 'ai',
+        text: result?.answer || 'Xin lỗi, tôi chưa thể trả lời.',
+        books: books.map((book: any, index: number) => ({
+          id: book._id || `book-${index}`,
+          bookId: book._id,
+          title: book.title || 'Tên sách không xác định',
+          author: book.author || 'Không rõ tác giả',
+          price: book.price ? `${book.price}đ` : book.price || 'Liên hệ',
+          image: book.coverImage || book.image || 'https://via.placeholder.com/150',
+          rating: Number(book.rating || 0),
+          reason: book.description ? book.description.slice(0, 120) : 'Sách hay, đáng đọc.',
+        })),
+      };
+
+      setChatId(result?.chatId || chatId);
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-error`,
+          type: 'ai',
+          text: 'Có lỗi khi kết nối đến AI. Vui lòng thử lại sau ít phút.',
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
