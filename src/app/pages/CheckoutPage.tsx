@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   ChevronLeft,
@@ -18,13 +18,17 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 export function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { items } = useCart();
+  const { items, clearCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
   const selectedCartItemIds = (location.state as { selectedCartItemIds?: Array<string | number> } | null)
     ?.selectedCartItemIds;
   const checkoutItems =
@@ -44,6 +48,11 @@ export function CheckoutPage() {
     discount: number;
   } | null>(null);
 
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -54,6 +63,112 @@ export function CheckoutPage() {
     ward: '',
     note: '',
   });
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchAddresses();
+    } else {
+      setShowAddressForm(true);
+      // For guest users, initialize with empty form
+      setFormData({
+        fullName: '',
+        phone: '',
+        email: '',
+        address: '',
+        city: '',
+        district: '',
+        ward: '',
+        note: '',
+      });
+    }
+  }, [isAuthenticated, user]);
+
+  const fetchAddresses = async () => {
+    try {
+      const response = await api.get('/users/me');
+      const userData = response.data.data;
+      if (userData.addresses && userData.addresses.length > 0) {
+        setAddresses(userData.addresses);
+        const defaultAddress = userData.addresses.find((addr: any) => addr.isDefault);
+        if (defaultAddress) {
+          setSelectedAddress(defaultAddress);
+          populateFormFromAddress(defaultAddress);
+        }
+      } else {
+        setShowAddressForm(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch addresses:', error);
+      setShowAddressForm(true);
+    }
+  };
+
+  const populateFormFromAddress = (address: any) => {
+    setFormData({
+      fullName: address.fullName || '',
+      phone: address.phone || '',
+      email: user?.email || '',
+      address: address.address?.street || '',
+      city: address.address?.city || '',
+      district: address.address?.district || '',
+      ward: address.address?.ward || '',
+      note: '',
+    });
+  };
+
+  const handleAddressSelect = (address: any) => {
+    setSelectedAddress(address);
+    populateFormFromAddress(address);
+    setShowAddressForm(false);
+  };
+
+  const handleAddNewAddress = () => {
+    setSelectedAddress(null);
+    setFormData({
+      fullName: user?.name || '',
+      phone: '',
+      email: user?.email || '',
+      address: '',
+      city: '',
+      district: '',
+      ward: '',
+      note: '',
+    });
+    setShowAddressForm(true);
+  };
+
+  const handleSaveAddress = async () => {
+    if (!isAuthenticated) return;
+
+    // Validate required fields
+    if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district || !formData.ward) {
+      alert('Vui lòng điền đầy đủ thông tin địa chỉ');
+      return;
+    }
+
+    try {
+      const addressData = {
+        fullName: formData.fullName,
+        phone: formData.phone,
+        address: {
+          street: formData.address,
+          ward: formData.ward,
+          district: formData.district,
+          city: formData.city,
+          country: 'Việt Nam',
+        },
+        isDefault: addresses.length === 0, // Set as default if first address
+      };
+
+      await api.post('/users/addresses', addressData);
+      await fetchAddresses(); // Refresh addresses
+      setShowAddressForm(false);
+      alert('Địa chỉ đã được lưu thành công');
+    } catch (error) {
+      console.error('Failed to save address:', error);
+      alert('Có lỗi xảy ra khi lưu địa chỉ');
+    }
+  };
 
   const shippingOptions = [
     {
@@ -130,11 +245,84 @@ export function CheckoutPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Process checkout
-    alert('Đặt hàng thành công! Cảm ơn bạn đã mua hàng tại Trạm Sách.');
-    navigate('/');
+
+    if (isSubmitting) return; // Prevent double submission
+
+    // Validate form
+    if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district || !formData.ward) {
+      alert('Vui lòng điền đầy đủ thông tin giao hàng');
+      return;
+    }
+
+    if (!isAuthenticated && !formData.email) {
+      alert('Vui lòng nhập email');
+      return;
+    }
+
+    if (checkoutItems.length === 0) {
+      alert('Giỏ hàng trống');
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmMessage = `
+Thông tin đơn hàng:
+- Người nhận: ${formData.fullName}
+- SĐT: ${formData.phone}
+- Địa chỉ: ${formData.address}, ${formData.ward}, ${formData.district}, ${formData.city}
+- Tổng tiền: ${finalTotal.toLocaleString('vi-VN')}đ
+- Phương thức thanh toán: ${paymentMethods.find(p => p.id === selectedPayment)?.name}
+
+Bạn có chắc chắn muốn đặt hàng?
+    `;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare order data
+      const orderData = {
+        items: checkoutItems.map(item => ({
+          bookId: item.id,
+          quantity: item.quantity
+        })),
+        customerInfo: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          email: formData.email || (user?.email || ''),
+          address: {
+            street: formData.address,
+            ward: formData.ward,
+            district: formData.district,
+            city: formData.city,
+            country: 'Việt Nam'
+          }
+        },
+        paymentMethod: selectedPayment,
+        note: formData.note
+      };
+
+      // Create order
+      const response = await api.post('/orders', orderData);
+      const order = response.data.data;
+
+      // Clear cart after successful order
+      await clearCart();
+
+      alert(`Đặt hàng thành công! Mã đơn hàng: ${order.orderCode}`);
+      navigate('/');
+
+    } catch (error: any) {
+      console.error('Order creation failed:', error);
+      alert(error.response?.data?.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (checkoutItems.length === 0) {
@@ -200,128 +388,225 @@ export function CheckoutPage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Họ và tên <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="Nhập họ và tên"
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                    />
+              {isAuthenticated && addresses.length > 0 && !showAddressForm ? (
+                // Display saved addresses
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Chọn địa chỉ giao hàng</h3>
+                    <button
+                      type="button"
+                      onClick={handleAddNewAddress}
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Thêm địa chỉ mới
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {addresses.map((address) => (
+                      <label
+                        key={address._id}
+                        className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                          selectedAddress?._id === address._id
+                            ? 'border-orange-500 bg-orange-50'
+                            : 'border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="selectedAddress"
+                            checked={selectedAddress?._id === address._id}
+                            onChange={() => handleAddressSelect(address)}
+                            className="mt-1 w-4 h-4 text-orange-500"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-900">{address.fullName}</span>
+                              {address.isDefault && (
+                                <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-full">
+                                  Mặc định
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              <div>{address.phone}</div>
+                              <div>{address.address.street}, {address.address.ward}, {address.address.district}, {address.address.city}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
+              ) : (
+                // Address form
+                <div className="space-y-4">
+                  {isAuthenticated && addresses.length > 0 && (
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Thêm địa chỉ mới</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressForm(false)}
+                        className="text-orange-500 hover:text-orange-600 transition-colors"
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Số điện thoại <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="Nhập số điện thoại"
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Họ và tên <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          name="fullName"
+                          value={formData.fullName}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Nhập họ và tên"
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Số điện thoại <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Nhập số điện thoại"
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          placeholder="Nhập email"
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Địa chỉ <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Số nhà, tên đường"
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tỉnh/Thành phố <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="city"
+                        value={formData.city}
+                        onChange={(e: any) => handleInputChange(e)}
+                        required
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                      >
+                        <option value="">Chọn Tỉnh/Thành phố</option>
+                        <option value="hcm">TP. Hồ Chí Minh</option>
+                        <option value="hanoi">Hà Nội</option>
+                        <option value="danang">Đà Nẵng</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Quận/Huyện <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="district"
+                        value={formData.district}
+                        onChange={(e: any) => handleInputChange(e)}
+                        required
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                      >
+                        <option value="">Chọn Quận/Huyện</option>
+                        <option value="1">Quận 1</option>
+                        <option value="3">Quận 3</option>
+                        <option value="10">Quận 10</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phường/Xã <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="ward"
+                        value={formData.ward}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Nhập Phường/Xã"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ghi chú đơn hàng
+                      </label>
+                      <textarea
+                        name="note"
+                        value={formData.note}
+                        onChange={handleInputChange}
+                        rows={3}
+                        placeholder="Ghi chú về đơn hàng, ví dụ: thời gian hay chỉ dẫn địa điểm giao hàng chi tiết hơn"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors resize-none"
+                      ></textarea>
+                    </div>
+
+                    {isAuthenticated && (
+                      <div className="col-span-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveAddress}
+                          className="w-full px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold"
+                        >
+                          Lưu địa chỉ
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Nhập email"
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Địa chỉ <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="Số nhà, tên đường"
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tỉnh/Thành phố <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="city"
-                    value={formData.city}
-                    onChange={(e: any) => handleInputChange(e)}
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                  >
-                    <option value="">Chọn Tỉnh/Thành phố</option>
-                    <option value="hcm">TP. Hồ Chí Minh</option>
-                    <option value="hanoi">Hà Nội</option>
-                    <option value="danang">Đà Nẵng</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quận/Huyện <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="district"
-                    value={formData.district}
-                    onChange={(e: any) => handleInputChange(e)}
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
-                  >
-                    <option value="">Chọn Quận/Huyện</option>
-                    <option value="1">Quận 1</option>
-                    <option value="3">Quận 3</option>
-                    <option value="10">Quận 10</option>
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ghi chú đơn hàng
-                  </label>
-                  <textarea
-                    name="note"
-                    value={formData.note}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Ghi chú về đơn hàng, ví dụ: thời gian hay chỉ dẫn địa điểm giao hàng chi tiết hơn"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors resize-none"
-                  ></textarea>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Shipping Method */}
@@ -588,10 +873,20 @@ export function CheckoutPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2"
                 >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Hoàn tất đơn hàng
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Hoàn tất đơn hàng
+                    </>
+                  )}
                 </button>
 
                 <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
