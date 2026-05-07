@@ -54,7 +54,7 @@ export function BestSellers() {
         <h2 className="text-3xl font-bold text-gray-900">Sách bán chạy</h2>
         <button
           type="button"
-          onClick={() => navigate('/books')}
+          onClick={() => navigate('/bestsellers')}
           className="text-orange-500 hover:text-orange-600 font-medium"
         >
           Xem tất cả →

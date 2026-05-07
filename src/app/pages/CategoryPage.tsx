@@ -8,7 +8,6 @@ import {
   Star,
   Grid3x3,
   List,
-  Heart,
   ShoppingCart,
   Eye,
   X,
@@ -31,6 +30,15 @@ interface Category {
   bookCount: number;
 }
 
+interface BackendCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  bookCount?: number;
+}
+
 export function CategoryPage() {
   const { category } = useParams();
   const navigate = useNavigate();
@@ -41,6 +49,7 @@ export function CategoryPage() {
   const [selectedRating, setSelectedRating] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Categories data
   const categories: Record<string, Category> = {
@@ -81,42 +90,7 @@ export function CategoryPage() {
       bookCount: 432,
     },
   };
-
-  const currentCategory = categories[category || 'van-hoc'] || categories['van-hoc'];
-
-  // Subcategories based on main category
-  const subCategories: Record<string, Array<{ id: string; name: string; count: number }>> = {
-    'van-hoc': [
-      { id: 'all', name: 'Tất cả', count: 1234 },
-      { id: 'tieu-thuyet', name: 'Tiểu thuyết', count: 456 },
-      { id: 'tho-ca', name: 'Thơ ca', count: 234 },
-      { id: 'truyen-ngan', name: 'Truyện ngắn', count: 345 },
-      { id: 'ky-su', name: 'Ký sự', count: 199 },
-    ],
-    'kinh-te': [
-      { id: 'all', name: 'Tất cả', count: 876 },
-      { id: 'tai-chinh', name: 'Tài chính cá nhân', count: 234 },
-      { id: 'quan-tri', name: 'Quản trị kinh doanh', count: 345 },
-      { id: 'marketing', name: 'Marketing', count: 198 },
-      { id: 'khoi-nghiep', name: 'Khởi nghiệp', count: 99 },
-    ],
-    'phat-trien-ban-than': [
-      { id: 'all', name: 'Tất cả', count: 654 },
-      { id: 'ky-nang-song', name: 'Kỹ năng sống', count: 234 },
-      { id: 'tam-ly', name: 'Tâm lý học', count: 189 },
-      { id: 'thanh-cong', name: 'Bí quyết thành công', count: 156 },
-      { id: 'giao-tiep', name: 'Giao tiếp', count: 75 },
-    ],
-    'thieu-nhi': [
-      { id: 'all', name: 'Tất cả', count: 432 },
-      { id: 'truyen-tranh', name: 'Truyện tranh', count: 156 },
-      { id: 'co-tich', name: 'Cổ tích', count: 123 },
-      { id: 'giao-duc', name: 'Giáo dục', count: 98 },
-      { id: 'tu-dien', name: 'Từ điển', count: 55 },
-    ],
-  };
-
-  const currentSubCategories = subCategories[category || 'van-hoc'] || subCategories['van-hoc'];
+  const currentFallbackCategory = categories[category || 'van-hoc'] || categories['van-hoc'];
 
   interface CategoryBook {
     _id: string;
@@ -135,14 +109,88 @@ export function CategoryPage() {
 
   const [books, setBooks] = useState<CategoryBook[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
-  const [categoryData, setCategoryData] = useState<{ _id: string; name: string; slug: string; description?: string } | null>(null);
+  const [categoryData, setCategoryData] = useState<BackendCategory | null>(null);
+  const [rootCategories, setRootCategories] = useState<BackendCategory[]>([]);
+  const [childrenCategories, setChildrenCategories] = useState<BackendCategory[]>([]);
   const [categoryNotFound, setCategoryNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [subCategoryCounts, setSubCategoryCounts] = useState<Record<string, number>>({});
 
-  const displayCategory = {
-    ...currentCategory,
-    name: categoryData?.name || currentCategory.name,
-    description: categoryData?.description || currentCategory.description,
+  const iconBySlug: Record<string, any> = {
+    'van-hoc': BookOpen,
+    'kinh-te': TrendingUp,
+    'phat-trien-ban-than': Sparkles,
+    'thieu-nhi': Award,
+  };
+
+  const currentCategoryWithDisplay: Category = {
+    ...currentFallbackCategory,
+    id: categoryData?.slug || currentFallbackCategory.id,
+    name: categoryData?.name || currentFallbackCategory.name,
+    description: categoryData?.description || currentFallbackCategory.description,
+    image: categoryData?.image || currentFallbackCategory.image,
+    icon: iconBySlug[categoryData?.slug || ''] || currentFallbackCategory.icon,
+    bookCount:
+      Object.values(subCategoryCounts).reduce((sum, value) => sum + value, 0) ||
+      categoryData?.bookCount ||
+      books.length ||
+      currentFallbackCategory.bookCount,
+  };
+
+  const totalBooksCount = Object.values(subCategoryCounts).reduce((sum, value) => sum + value, 0);
+
+  const currentSubCategories = [
+    { id: 'all', name: 'Tất cả', count: totalBooksCount },
+    ...childrenCategories.map((sub) => ({
+      id: sub._id,
+      name: sub.name,
+      count: subCategoryCounts[sub._id] ?? 0,
+    })),
+  ];
+
+  
+  const getSortParams = () => {
+    switch (sortBy) {
+      case 'price-low':
+        return { sortBy: 'price', sortOrder: 1 };
+      case 'price-high':
+        return { sortBy: 'price', sortOrder: -1 };
+      case 'rating':
+        return { sortBy: 'rating', sortOrder: -1 };
+      case 'bestseller':
+      case 'popular':
+        return { sortBy: 'sold', sortOrder: -1 };
+      case 'newest':
+      default:
+        return { sortBy: 'createdAt', sortOrder: -1 };
+    }
+  };
+
+  const getApiFilterParams = () => {
+    const params: Record<string, number> = {};
+
+    if (selectedPriceRange === '0-50') {
+      params.maxPrice = 50000;
+    } else if (selectedPriceRange === '50-100') {
+      params.minPrice = 50000;
+      params.maxPrice = 100000;
+    } else if (selectedPriceRange === '100-150') {
+      params.minPrice = 100000;
+      params.maxPrice = 150000;
+    } else if (selectedPriceRange === '150-200') {
+      params.minPrice = 150000;
+      params.maxPrice = 200000;
+    } else if (selectedPriceRange === '200+') {
+      params.minPrice = 200000;
+    }
+
+    if (selectedRating === '4+') {
+      params.minRating = 4;
+    } else if (selectedRating === '4.5+') {
+      params.minRating = 4.5;
+    }
+
+    return params;
   };
 
   function formatCurrency(value: number) {
@@ -151,6 +199,22 @@ export function CategoryPage() {
       currency: 'VND',
     }).format(value);
   }
+
+  useEffect(() => {
+    setSelectedSubCategory('all');
+    setCurrentPage(1);
+  }, [category]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSubCategory, selectedPriceRange, selectedRating, sortBy]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(books.length / 12));
+    if (currentPage > nextTotalPages) {
+      setCurrentPage(nextTotalPages);
+    }
+  }, [books, currentPage]);
 
   useEffect(() => {
     const loadCategoryBooks = async () => {
@@ -165,26 +229,99 @@ export function CategoryPage() {
       setErrorMessage('');
 
       try {
+        const rootResponse = await api.get('/categories', {
+          params: { parentId: 'null', limit: 100 },
+        });
+        setRootCategories(rootResponse.data.data || []);
+
         const categoryResponse = await api.get(`/categories/slug/${category}`);
         const categoryInfo = categoryResponse.data.data;
         setCategoryData(categoryInfo);
 
-        const booksResponse = await api.get('/books', {
-          params: {
-            categoryId: categoryInfo._id,
-            page: 1,
-            limit: 24,
-          },
-        });
+        const childResponse = await api.get(`/categories/${categoryInfo._id}/children`);
+        const children = childResponse.data.data || [];
+        setChildrenCategories(children);
 
-        setBooks(booksResponse.data.data || booksResponse.data || []);
+        const sortParams = getSortParams();
+        const filterParams = getApiFilterParams();
+        const categoryIds = [categoryInfo._id, ...children.map((c: BackendCategory) => c._id)];
+
+        const countResults = await Promise.all(
+          categoryIds.map((id: string) =>
+            api.get('/books', {
+              params: {
+                categoryId: id,
+                page: 1,
+                limit: 1,
+                ...filterParams,
+              },
+            }),
+          ),
+        );
+
+        const nextCounts: Record<string, number> = {};
+        countResults.forEach((res, idx) => {
+          const id = categoryIds[idx];
+          nextCounts[id] = res.data?.pagination?.total ?? 0;
+        });
+        setSubCategoryCounts(nextCounts);
+
+        if (selectedSubCategory !== 'all') {
+          const booksResponse = await api.get('/books', {
+            params: {
+              categoryId: selectedSubCategory,
+              page: 1,
+              limit: 200,
+              ...sortParams,
+              ...filterParams,
+            },
+          });
+          setBooks(booksResponse.data.data || booksResponse.data || []);
+        } else {
+          const bookResults = await Promise.all(
+            categoryIds.map((id: string) =>
+              api.get('/books', {
+                params: {
+                  categoryId: id,
+                  page: 1,
+                  limit: 200,
+                  ...sortParams,
+                  ...filterParams,
+                },
+              }),
+            ),
+          );
+
+          const merged: CategoryBook[] = bookResults
+            .flatMap((res) => res.data.data || res.data || [])
+            .filter((book: CategoryBook, index: number, arr: CategoryBook[]) => (
+              arr.findIndex((item) => item._id === book._id) === index
+            ));
+
+          const sortedMerged = [...merged].sort((a, b) => {
+            const priceA = a.discountPrice ?? a.price;
+            const priceB = b.discountPrice ?? b.price;
+            const ratingA = a.rating ?? 0;
+            const ratingB = b.rating ?? 0;
+            const soldA = a.sold ?? 0;
+            const soldB = b.sold ?? 0;
+
+            if (sortBy === 'price-low') return priceA - priceB;
+            if (sortBy === 'price-high') return priceB - priceA;
+            if (sortBy === 'rating') return ratingB - ratingA;
+            if (sortBy === 'bestseller' || sortBy === 'popular') return soldB - soldA;
+            return 0;
+          });
+
+          setBooks(sortedMerged);
+        }
       } catch (error) {
         console.error('Failed to load category books', error);
         const status = (error as any)?.response?.status;
         if (status === 404) {
           setCategoryNotFound(true);
         } else {
-          setErrorMessage('Không thể tải dữ liệu. Vui lòng thử lại sau.');
+          setErrorMessage('Dang co su co khi tai du lieu. Ban vui long thu lai sau it phut.');
         }
         setBooks([]);
       } finally {
@@ -193,13 +330,12 @@ export function CategoryPage() {
     };
 
     loadCategoryBooks();
-  }, [category]);
-
-  const categoryId = categoryData?._id || '';
-
-  const currentCategoryWithDisplay = displayCategory;
+  }, [category, selectedSubCategory, selectedPriceRange, selectedRating, sortBy]);
 
   const booksLoaded = !loadingBooks && !categoryNotFound && !errorMessage;
+  const pageSize = 12;
+  const totalPages = Math.max(1, Math.ceil(books.length / pageSize));
+  const paginatedBooks = books.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const priceRanges = [
     { id: 'all', name: 'Tất cả mức giá' },
@@ -218,6 +354,18 @@ export function CategoryPage() {
     { id: 'price-high', name: 'Giá cao đến thấp' },
     { id: 'newest', name: 'Mới nhất' },
   ];
+
+  const displayCategories = rootCategories.length
+    ? rootCategories.map((cat) => ({
+        id: cat.slug,
+        name: cat.name,
+        icon: iconBySlug[cat.slug] || BookOpen,
+      }))
+    : Object.values(categories).map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon,
+      }));
 
   const CategoryIcon = currentCategoryWithDisplay.icon;
 
@@ -241,9 +389,11 @@ export function CategoryPage() {
               Danh mục
             </button>
             <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-orange-600 font-medium">
+           <span className="text-orange-600 font-medium">
               {currentCategoryWithDisplay.name}
             </span>
+              
+              
           </div>
         </div>
       </div>
@@ -292,17 +442,17 @@ export function CategoryPage() {
       </div>
 
       {/* Other Categories */}
-      <div className="bg-white border-b">
+      {/* <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4 overflow-x-auto">
-            {Object.values(categories).map((cat) => {
+            {displayCategories.map((cat) => {
               const Icon = cat.icon;
               return (
                 <button
                   key={cat.id}
                   onClick={() => navigate(`/category/${cat.id}`)}
                   className={`flex items-center gap-3 px-6 py-3 rounded-xl border-2 transition-all whitespace-nowrap ${
-                    cat.id === currentCategory.id
+                    cat.id === (category || 'van-hoc')
                       ? 'border-orange-500 bg-orange-50 text-orange-600'
                       : 'border-gray-200 hover:border-orange-300 text-gray-700'
                   }`}
@@ -314,7 +464,7 @@ export function CategoryPage() {
             })}
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
@@ -534,9 +684,33 @@ export function CategoryPage() {
 
           {/* Books Grid/List */}
           <div className="col-span-9">
-            {viewMode === 'grid' ? (
+            {loadingBooks ? (
+              <div className="bg-white border rounded-xl p-8 text-center text-gray-600">
+                Dang tai danh sach sach...
+              </div>
+            ) : paginatedBooks.length === 0 ? (
+              <div className="bg-white border rounded-xl p-8 text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Chua tim thay sach phu hop
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Ban thu dieu chinh bo loc hoac quay lai tat ca danh muc con nhe.
+                </p>
+                <button
+                  onClick={() => {
+                    setSelectedSubCategory('all');
+                    setSelectedPriceRange('all');
+                    setSelectedRating('all');
+                    setSortBy('popular');
+                  }}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Dat lai bo loc
+                </button>
+              </div>
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-3 gap-6">
-                {books.map((book) => {
+                {paginatedBooks.map((book) => {
                   const imageSrc = book.coverImage || book.images?.[0] || `https://picsum.photos/seed/${book._id}/360/480`;
                   const displayPrice = book.discountPrice ?? book.price;
                   const originalPrice = book.discountPrice ? book.price : null;
@@ -577,9 +751,6 @@ export function CategoryPage() {
                           className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all transform hover:scale-110"
                         >
                           <Eye className="w-5 h-5" />
-                        </button>
-                        <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all transform hover:scale-110">
-                          <Heart className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -644,7 +815,7 @@ export function CategoryPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {books.map((book) => {
+                {paginatedBooks.map((book) => {
                   const imageSrc = book.coverImage || book.images?.[0] || `https://picsum.photos/seed/${book._id}/360/480`;
                   const displayPrice = book.discountPrice ?? book.price;
                   const originalPrice = book.discountPrice ? book.price : null;
@@ -745,9 +916,6 @@ export function CategoryPage() {
                         >
                           Xem chi tiết
                         </button>
-                        <button className="w-10 h-10 border-2 border-gray-200 rounded-lg flex items-center justify-center hover:border-red-500 hover:text-red-500 transition-colors">
-                          <Heart className="w-5 h-5" />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -757,29 +925,47 @@ export function CategoryPage() {
             )}
 
             {/* Pagination */}
-            <div className="mt-8 flex items-center justify-center gap-2">
-              <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
-                Trước
-              </button>
-              {[1, 2, 3, 4, 5].map((page) => (
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
                 <button
-                  key={page}
-                  className={`w-10 h-10 rounded-lg font-medium transition-colors ${
-                    page === 1
-                      ? 'bg-orange-500 text-white'
-                      : 'border-2 border-gray-200 hover:border-orange-500 hover:text-orange-600'
-                  }`}
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {page}
+                  Truoc
                 </button>
-              ))}
-              <button className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium">
-                Sau
-              </button>
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                      page === currentPage
+                        ? 'bg-orange-500 text-white'
+                        : 'border-2 border-gray-200 hover:border-orange-500 hover:text-orange-600'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sau
+                </button>
+              </div>
+            )}
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
+
+
+
+
+
+
+

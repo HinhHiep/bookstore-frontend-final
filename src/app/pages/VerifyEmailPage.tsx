@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { BookOpen, Mail, AlertCircle, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function VerifyEmailPage() {
   const [otp, setOtp] = useState('');
@@ -30,7 +31,7 @@ export function VerifyEmailPage() {
 
   const resendOtp = async () => {
     // TODO: Implement resend OTP
-    alert('Chức năng gửi lại OTP chưa được triển khai.');
+    toast.info('Tinh nang gui lai OTP se duoc cap nhat som.');
   };
 
   return (

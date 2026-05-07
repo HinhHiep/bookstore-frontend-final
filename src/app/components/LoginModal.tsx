@@ -34,7 +34,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       if (isLoginMode) {
         if (!email || !password) {
-          setError('Vui lòng điền đầy đủ thông tin');
+          setError('Ban vui long nhap day du thong tin nhe.');
           setIsLoading(false);
           return;
         }
@@ -49,12 +49,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }
       } else {
         if (!name || !email || !password) {
-          setError('Vui lòng điền đầy đủ thông tin');
+          setError('Ban vui long nhap day du thong tin nhe.');
           setIsLoading(false);
           return;
         }
         if (password.length < 6) {
-          setError('Mật khẩu phải có ít nhất 6 ký tự');
+          setError('Mat khau can it nhat 6 ky tu.');
           setIsLoading(false);
           return;
         }
@@ -64,11 +64,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setEmail('');
         setPassword('');
         // Chuyển sang xác thực email sau khi đăng ký thành công
-        setSuccessMessage('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
+        setSuccessMessage('Dang ky thanh cong! Ban hay kiem tra email de xac thuc tai khoan.');
         onClose();
       }
     } catch (err) {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+      setError('Da co su co xay ra. Ban thu lai giup minh nhe.');
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     try {
       if (!email) {
-        setError('Vui lòng nhập địa chỉ email');
+        setError('Ban vui long nhap dia chi email.');
         setIsLoading(false);
         return;
       }
@@ -90,10 +90,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       // Simulate API call for password reset
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
-      setSuccessMessage('Chúng tôi đã gửi link đặt lại mật khẩu đến email của bạn. Vui lòng kiểm tra hộp thư!');
+      setSuccessMessage('Minh da gui link dat lai mat khau vao email cua ban. Ban kiem tra hop thu nhe!');
       setEmail('');
     } catch (err) {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+      setError('Da co su co xay ra. Ban thu lai giup minh nhe.');
     } finally {
       setIsLoading(false);
     }

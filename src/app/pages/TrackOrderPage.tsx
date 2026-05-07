@@ -1,5 +1,5 @@
-﻿import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, FormEvent, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router';
 import {
   Search,
   Package,
@@ -30,15 +30,18 @@ const statusStepIndex: Record<string, number> = {
 };
 
 const statusTextMap: Record<string, string> = {
-  pending: 'Chờ xử lý',
-  confirmed: 'Đã xác nhận',
-  shipping: 'Đang vận chuyển',
-  completed: 'Giao hàng thành công',
-  cancelled: 'Đã hủy',
+  pending: 'Ch? x? l�',
+  confirmed: '�� x�c nh?n',
+  shipping: '�ang v?n chuy?n',
+  completed: 'Giao h�ng th�nh c�ng',
+  cancelled: '�� h?y',
 };
 
 export function TrackOrderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefilledOrderCode = (location.state as { orderCode?: string; successMessage?: string } | null)?.orderCode || '';
+  const successMessage = (location.state as { orderCode?: string; successMessage?: string } | null)?.successMessage || '';
   const [orderCode, setOrderCode] = useState('');
   const [showTracking, setShowTracking] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(0);
@@ -53,21 +56,21 @@ export function TrackOrderPage() {
       ? value
       : 0;
 
-    return amount.toLocaleString('vi-VN') + 'đ';
+    return amount.toLocaleString('vi-VN') + 'd';
   };
 
-  const getStatusText = (status: string) => statusTextMap[status] || 'Đang cập nhật';
+  const getStatusText = (status: string) => statusTextMap[status] || '�ang c?p nh?t';
 
   const getStatusIndex = (status: string) => statusStepIndex[status] ?? 0;
 
   const getFormattedDate = (value?: string | number | Date) => {
-    if (!value) return 'Đang cập nhật';
+    if (!value) return '�ang c?p nh?t';
     const date = new Date(value);
     return date.toLocaleDateString('vi-VN');
   };
 
   const getEstimatedDelivery = (value?: string | number | Date) => {
-    if (!value) return 'Đang cập nhật';
+    if (!value) return '�ang c?p nh?t';
     const date = new Date(value).getTime() + 3 * 24 * 60 * 60 * 1000;
     return new Date(date).toLocaleDateString('vi-VN');
   };
@@ -75,52 +78,50 @@ export function TrackOrderPage() {
   const trackingSteps = [
     {
       id: 0,
-      title: 'Đơn hàng đã đặt',
-      description: 'Đơn hàng đã được tạo thành công',
+      title: '�on h�ng d� d?t',
+      description: '�on h�ng d� du?c t?o th�nh c�ng',
       time: orderData?.createdAt ? `${getFormattedDate(orderData.createdAt)} - 10:30` : '',
       icon: ClipboardCheck,
       color: 'bg-green-500',
     },
     {
       id: 1,
-      title: 'Đã xác nhận',
-      description: 'Đơn hàng đã được xác nhận và đang chờ đóng gói',
+      title: '�� x�c nh?n',
+      description: '�on h�ng d� du?c x�c nh?n v� dang ch? d�ng g�i',
       time: orderData?.status === 'confirmed' ? `${getFormattedDate(orderData.createdAt)} - 11:00` : '',
       icon: CheckCircle2,
       color: 'bg-green-500',
     },
     {
       id: 2,
-      title: 'Đang đóng gói',
-      description: 'Đơn hàng đang được đóng gói tại kho',
+      title: '�ang d�ng g�i',
+      description: '�on h�ng dang du?c d�ng g�i t?i kho',
       time: orderData?.status === 'confirmed' ? `${getFormattedDate(orderData.createdAt)} - 14:30` : '',
       icon: Box,
       color: 'bg-green-500',
     },
     {
       id: 3,
-      title: 'Đang vận chuyển',
-      description: 'Đơn hàng đang được giao đến bạn',
+      title: '�ang v?n chuy?n',
+      description: '�on h�ng dang du?c giao d?n b?n',
       time: orderData?.status === 'shipping' ? `${getFormattedDate(orderData.createdAt)} - 08:00` : '',
       icon: Truck,
       color: 'bg-orange-500',
     },
     {
       id: 4,
-      title: 'Giao hàng thành công',
-      description: 'Đơn hàng đã được giao thành công',
+      title: 'Giao h�ng th�nh c�ng',
+      description: '�on h�ng d� du?c giao th�nh c�ng',
       time: orderData?.status === 'completed' ? getEstimatedDelivery(orderData.createdAt) : '',
       icon: PackageCheck,
       color: 'bg-gray-300',
     },
   ];
 
-  const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const code = orderCode.trim().replace(/^#/, '');
+  const fetchOrderByCode = async (rawCode: string) => {
+    const code = rawCode.trim().replace(/^#/, '');
     if (!code) {
-      setError('Vui lòng nhập mã đơn hàng');
+      setError('Vui l�ng nh?p m� don h�ng');
       return;
     }
 
@@ -131,7 +132,7 @@ export function TrackOrderPage() {
       const response = await api.get(`/orders/code/${encodeURIComponent(code)}`);
       const order = response.data?.data;
       if (!order) {
-        throw new Error('Không tìm thấy đơn hàng');
+        throw new Error('Kh�ng t�m th?y don h�ng');
       }
 
       setOrderData(order);
@@ -140,10 +141,21 @@ export function TrackOrderPage() {
     } catch (err: any) {
       setShowTracking(false);
       setOrderData(null);
-      setError(err?.response?.data?.message || err?.message || 'Không tìm thấy đơn hàng');
+      setError(err?.response?.data?.message || err?.message || 'Kh�ng t�m th?y don h�ng');
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (!prefilledOrderCode) return;
+    setOrderCode(prefilledOrderCode);
+    fetchOrderByCode(prefilledOrderCode);
+  }, [prefilledOrderCode]);
+
+  const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await fetchOrderByCode(orderCode);
   };
 
   if (!showTracking) {
@@ -154,16 +166,21 @@ export function TrackOrderPage() {
             <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
               <Package className="w-12 h-12 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Tra cứu đơn hàng</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Tra c?u don h�ng</h1>
             <p className="text-lg text-gray-600">
-              Nhập mã đơn hàng để theo dõi tình trạng giao hàng của bạn
+              Nh?p m� don h�ng d? theo d�i t�nh tr?ng giao h�ng c?a b?n
             </p>
           </div>
 
           <form onSubmit={handleSearch} className="mb-12">
             <div className="bg-white rounded-2xl shadow-2xl p-8">
+              {successMessage && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {successMessage}
+                </div>
+              )}
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Mã đơn hàng
+                M� don h�ng
               </label>
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -172,7 +189,7 @@ export function TrackOrderPage() {
                     type="text"
                     value={orderCode}
                     onChange={(e) => setOrderCode(e.target.value)}
-                    placeholder="Nhập mã đơn hàng (VD: #DH001235)"
+                    placeholder="Nh?p m� don h�ng (VD: #DH001235)"
                     className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition-colors text-lg"
                   />
                 </div>
@@ -182,12 +199,12 @@ export function TrackOrderPage() {
                   className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Search className="w-5 h-5" />
-                  {loading ? 'Đang tìm...' : 'Tra cứu'}
+                  {loading ? '�ang t�m...' : 'Tra c?u'}
                 </button>
               </div>
               {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
               <p className="text-sm text-gray-500 mt-3">
-                Bạn có thể tìm mã đơn hàng trong email xác nhận hoặc tin nhắn SMS
+                B?n c� th? t�m m� don h�ng trong email x�c nh?n ho?c tin nh?n SMS
               </p>
             </div>
           </form>
@@ -197,29 +214,29 @@ export function TrackOrderPage() {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Truck className="w-8 h-8 text-blue-600" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">Giao hàng nhanh</h3>
-              <p className="text-sm text-gray-600">Giao hàng trong 2-3 ngày làm việc</p>
+              <h3 className="font-bold text-gray-900 mb-2">Giao h�ng nhanh</h3>
+              <p className="text-sm text-gray-600">Giao h�ng trong 2-3 ng�y l�m vi?c</p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <PackageCheck className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">Theo dõi realtime</h3>
-              <p className="text-sm text-gray-600">Cập nhật trạng thái đơn hàng liên tục</p>
+              <h3 className="font-bold text-gray-900 mb-2">Theo d�i realtime</h3>
+              <p className="text-sm text-gray-600">C?p nh?t tr?ng th�i don h�ng li�n t?c</p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <MessageCircle className="w-8 h-8 text-orange-600" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">Hỗ trợ 24/7</h3>
-              <p className="text-sm text-gray-600">Luôn sẵn sàng hỗ trợ bạn mọi lúc</p>
+              <h3 className="font-bold text-gray-900 mb-2">H? tr? 24/7</h3>
+              <p className="text-sm text-gray-600">Lu�n s?n s�ng h? tr? b?n m?i l�c</p>
             </div>
           </div>
 
           <div className="mt-12 bg-white rounded-2xl shadow-lg p-6">
-            <h3 className="font-bold text-gray-900 mb-4">Liên kết nhanh</h3>
+            <h3 className="font-bold text-gray-900 mb-4">Li�n k?t nhanh</h3>
             <div className="space-y-2">
               <button
                 onClick={() => navigate('/account')}
@@ -227,7 +244,7 @@ export function TrackOrderPage() {
               >
                 <div className="flex items-center gap-3">
                   <User className="w-5 h-5 text-gray-600 group-hover:text-orange-600" />
-                  <span className="font-medium text-gray-900">Xem tất cả đơn hàng</span>
+                  <span className="font-medium text-gray-900">Xem t?t c? don h�ng</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600" />
               </button>
@@ -237,7 +254,7 @@ export function TrackOrderPage() {
               >
                 <div className="flex items-center gap-3">
                   <Package className="w-5 h-5 text-gray-600 group-hover:text-orange-600" />
-                  <span className="font-medium text-gray-900">Tiếp tục mua sắm</span>
+                  <span className="font-medium text-gray-900">Ti?p t?c mua s?m</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600" />
               </button>
@@ -266,7 +283,7 @@ export function TrackOrderPage() {
                   type="text"
                   value={orderCode}
                   onChange={(e) => setOrderCode(e.target.value)}
-                  placeholder="Nhập mã đơn hàng khác"
+                  placeholder="Nh?p m� don h�ng kh�c"
                   className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
                 />
               </div>
@@ -279,11 +296,11 @@ export function TrackOrderPage() {
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-lg p-8 mb-8 text-white">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <div className="text-sm opacity-90 mb-2">Mã đơn hàng</div>
+              <div className="text-sm opacity-90 mb-2">M� don h�ng</div>
               <div className="text-3xl font-bold">{orderData?.orderCode}</div>
             </div>
             <div className="text-right">
-              <div className="text-sm opacity-90 mb-2">Ngày đặt hàng</div>
+              <div className="text-sm opacity-90 mb-2">Ng�y d?t h�ng</div>
               <div className="text-xl font-bold">{getFormattedDate(orderData?.createdAt)}</div>
             </div>
           </div>
@@ -293,12 +310,12 @@ export function TrackOrderPage() {
                 <Truck className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm opacity-90">Trạng thái</div>
+                <div className="text-sm opacity-90">Tr?ng th�i</div>
                 <div className="text-xl font-bold">{getStatusText(orderData?.status)}</div>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm opacity-90">Dự kiến giao hàng</div>
+              <div className="text-sm opacity-90">D? ki?n giao h�ng</div>
               <div className="text-xl font-bold">{getEstimatedDelivery(orderData?.createdAt)}</div>
             </div>
           </div>
@@ -307,7 +324,7 @@ export function TrackOrderPage() {
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-8 space-y-8">
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8">Lộ trình vận chuyển</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-8">L? tr�nh v?n chuy?n</h2>
 
               <div className="relative">
                 <div className="absolute left-6 top-0 bottom-0 w-1 bg-gray-200"></div>
@@ -351,7 +368,7 @@ export function TrackOrderPage() {
                           {isCurrent && (
                             <div className="mt-3 inline-flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-medium">
                               <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                              Trạng thái hiện tại
+                              Tr?ng th�i hi?n t?i
                             </div>
                           )}
                         </div>
@@ -363,7 +380,7 @@ export function TrackOrderPage() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Sản phẩm ({orderData?.items?.length ?? 0})</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">S?n ph?m ({orderData?.items?.length ?? 0})</h2>
 
               <div className="space-y-4">
                 {orderData?.items?.map((item: any) => {
@@ -383,7 +400,7 @@ export function TrackOrderPage() {
                         <h3 className="font-bold text-gray-900 mb-1">{item.title}</h3>
                         <p className="text-sm text-gray-600 mb-2">{formatMoney(itemPrice)} x {item.quantity}</p>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Tổng: {formatMoney(itemTotal)}</span>
+                          <span className="text-sm text-gray-600">T?ng: {formatMoney(itemTotal)}</span>
                         </div>
                       </div>
                     </div>
@@ -393,7 +410,7 @@ export function TrackOrderPage() {
 
               <div className="mt-6 pt-6 border-t space-y-3">
                 <div className="flex items-center justify-between text-gray-600">
-                  <span>Tạm tính</span>
+                  <span>T?m t�nh</span>
                   <span className="font-medium">
                     {formatMoney(
                       orderData?.items?.reduce((sum: number, item: any) => sum + (item.total ?? (item.finalPrice ?? item.price) * item.quantity), 0) ?? 0
@@ -401,11 +418,11 @@ export function TrackOrderPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-gray-600">
-                  <span>Phí vận chuyển</span>
+                  <span>Ph� v?n chuy?n</span>
                   <span className="font-medium">{formatMoney(orderData?.shippingFee ?? 0)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xl font-bold text-gray-900 pt-3 border-t">
-                  <span>Tổng cộng</span>
+                  <span>T?ng c?ng</span>
                   <span className="text-orange-600">{formatMoney(orderData?.finalAmount ?? 0)}</span>
                 </div>
               </div>
@@ -418,30 +435,30 @@ export function TrackOrderPage() {
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <Truck className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="font-bold text-gray-900">Thông tin giao hàng</h3>
+                <h3 className="font-bold text-gray-900">Th�ng tin giao h�ng</h3>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <User className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Người giao hàng</div>
-                    <div className="font-medium text-gray-900">{orderData?.courier?.name ?? 'Đội ngũ giao hàng'}</div>
+                    <div className="text-sm text-gray-600 mb-1">Ngu?i giao h�ng</div>
+                    <div className="font-medium text-gray-900">{orderData?.courier?.name ?? '�?i ngu giao h�ng'}</div>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
                   <Package className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Đơn vị vận chuyển</div>
-                    <div className="font-medium text-gray-900">{orderData?.courier?.company ?? 'Đơn vị vận chuyển'}</div>
+                    <div className="text-sm text-gray-600 mb-1">�on v? v?n chuy?n</div>
+                    <div className="font-medium text-gray-900">{orderData?.courier?.company ?? '�on v? v?n chuy?n'}</div>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
                   <Phone className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Số điện thoại</div>
+                    <div className="text-sm text-gray-600 mb-1">S? di?n tho?i</div>
                     <a href={`tel:${orderData?.courier?.phone ?? '0987654321'}`} className="font-medium text-orange-600 hover:text-orange-700">
                       {orderData?.courier?.phone ?? '0987654321'}
                     </a>
@@ -451,7 +468,7 @@ export function TrackOrderPage() {
 
               <button className="w-full mt-6 bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
                 <Phone className="w-4 h-4" />
-                Gọi người giao hàng
+                G?i ngu?i giao h�ng
               </button>
             </div>
 
@@ -460,14 +477,14 @@ export function TrackOrderPage() {
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                   <Home className="w-5 h-5 text-green-600" />
                 </div>
-                <h3 className="font-bold text-gray-900">Địa chỉ nhận hàng</h3>
+                <h3 className="font-bold text-gray-900">�?a ch? nh?n h�ng</h3>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <User className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Người nhận</div>
+                    <div className="text-sm text-gray-600 mb-1">Ngu?i nh?n</div>
                     <div className="font-medium text-gray-900">{orderData?.customerInfo?.fullName}</div>
                   </div>
                 </div>
@@ -475,7 +492,7 @@ export function TrackOrderPage() {
                 <div className="flex items-start gap-3">
                   <Phone className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Số điện thoại</div>
+                    <div className="text-sm text-gray-600 mb-1">S? di?n tho?i</div>
                     <div className="font-medium text-gray-900">{orderData?.customerInfo?.phone}</div>
                   </div>
                 </div>
@@ -483,7 +500,7 @@ export function TrackOrderPage() {
                 <div className="flex items-start gap-3">
                   <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm text-gray-600 mb-1">Địa chỉ</div>
+                    <div className="text-sm text-gray-600 mb-1">�?a ch?</div>
                     <div className="font-medium text-gray-900">
                       {[
                         orderData?.customerInfo?.address?.street,
@@ -505,19 +522,19 @@ export function TrackOrderPage() {
                 <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                   <CreditCard className="w-5 h-5 text-orange-600" />
                 </div>
-                <h3 className="font-bold text-gray-900">Thanh toán</h3>
+                <h3 className="font-bold text-gray-900">Thanh to�n</h3>
               </div>
 
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <span className="text-gray-600">Phương thức</span>
+                <span className="text-gray-600">Phuong th?c</span>
                 <span className="font-bold text-gray-900">
                   {orderData?.payment?.method === 'cod'
-                    ? 'Thanh toán khi nhận hàng'
+                    ? 'Thanh to�n khi nh?n h�ng'
                     : orderData?.payment?.method === 'bank'
-                    ? 'Chuyển khoản ngân hàng'
+                    ? 'Chuy?n kho?n ng�n h�ng'
                     : orderData?.payment?.method === 'momo'
                     ? 'MOMO'
-                    : 'Khác'}
+                    : 'Kh�c'}
                 </span>
               </div>
             </div>
@@ -527,19 +544,19 @@ export function TrackOrderPage() {
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                   <MessageCircle className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="font-bold text-gray-900">Cần hỗ trợ?</h3>
+                <h3 className="font-bold text-gray-900">C?n h? tr??</h3>
               </div>
 
-              <p className="text-sm text-gray-600 mb-4">Liên hệ với chúng tôi nếu bạn cần hỗ trợ về đơn hàng</p>
+              <p className="text-sm text-gray-600 mb-4">Li�n h? v?i ch�ng t�i n?u b?n c?n h? tr? v? don h�ng</p>
 
               <div className="space-y-2">
                 <button className="w-full bg-white border border-blue-200 text-blue-700 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
                   <MessageCircle className="w-4 h-4" />
-                  Chat với CSKH
+                  Chat v?i CSKH
                 </button>
                 <button className="w-full bg-white border border-blue-200 text-blue-700 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
                   <Phone className="w-4 h-4" />
-                  Gọi hotline
+                  G?i hotline
                 </button>
               </div>
             </div>
@@ -547,11 +564,11 @@ export function TrackOrderPage() {
             <div className="space-y-3">
               <button className="w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
                 <Download className="w-4 h-4" />
-                Tải hóa đơn
+                T?i h�a don
               </button>
               <button className="w-full border-2 border-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:border-orange-300 hover:bg-orange-50 transition-all flex items-center justify-center gap-2">
                 <Star className="w-4 h-4" />
-                Đánh giá đơn hàng
+                ��nh gi� don h�ng
               </button>
             </div>
           </div>
@@ -560,3 +577,10 @@ export function TrackOrderPage() {
     </div>
   );
 }
+
+
+
+
+
+
+

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import api from '../utils/api';
 import {
   LayoutDashboard,
   BookOpen,
@@ -24,6 +25,7 @@ import {
   Upload,
   AlertTriangle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   LineChart,
   Line,
@@ -54,6 +56,8 @@ export function AdminPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedBook, setSelectedBook] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [orderStatusDraft, setOrderStatusDraft] = useState('');
   const [exportOptions, setExportOptions] = useState({
     reportType: 'revenue',
     dateFrom: '',
@@ -70,201 +74,139 @@ export function AdminPage() {
     image: '',
   });
 
-  // Mock data
-  const stats = [
-    {
-      title: 'Tổng doanh thu',
-      value: '125.5M',
-      change: '+12.5%',
-      icon: DollarSign,
-      color: 'bg-green-500',
-      textColor: 'text-green-600',
-      bgLight: 'bg-green-50',
-    },
-    {
-      title: 'Đơn hàng',
-      value: '1,234',
-      change: '+8.2%',
-      icon: ShoppingCart,
-      color: 'bg-blue-500',
-      textColor: 'text-blue-600',
-      bgLight: 'bg-blue-50',
-    },
-    {
-      title: 'Khách hàng',
-      value: '856',
-      change: '+15.3%',
-      icon: Users,
-      textColor: 'text-purple-600',
-      color: 'bg-purple-500',
-      bgLight: 'bg-purple-50',
-    },
-    {
-      title: 'Sản phẩm',
-      value: '342',
-      change: '+5.1%',
-      icon: Package,
-      textColor: 'text-orange-600',
-      color: 'bg-orange-500',
-      bgLight: 'bg-orange-50',
-    },
-  ];
+    const [stats, setStats] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [books, setBooks] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
-  const revenueData = [
-    { month: 'T1', revenue: 45, orders: 120 },
-    { month: 'T2', revenue: 52, orders: 145 },
-    { month: 'T3', revenue: 48, orders: 130 },
-    { month: 'T4', revenue: 61, orders: 165 },
-    { month: 'T5', revenue: 55, orders: 155 },
-    { month: 'T6', revenue: 67, orders: 180 },
-    { month: 'T7', revenue: 70, orders: 190 },
-    { month: 'T8', revenue: 75, orders: 210 },
-  ];
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const [booksRes, ordersRes, categoriesRes] = await Promise.all([
+          api.get('/books', { params: { page: 1, limit: 200, sortBy: 'createdAt', sortOrder: -1 } }),
+          api.get('/orders'),
+          api.get('/categories', { params: { status: 'active', limit: 200, page: 1 } }),
+        ]);
 
-  const categoryData = [
-    { name: 'Văn học', value: 35, color: '#F97316' },
-    { name: 'Kinh tế', value: 28, color: '#3B82F6' },
-    { name: 'Phát triển', value: 22, color: '#8B5CF6' },
-    { name: 'Thiếu nhi', value: 15, color: '#10B981' },
-  ];
+        const booksData = booksRes.data?.data || [];
+        const ordersData = ordersRes.data?.data || [];
+        const categoriesData = categoriesRes.data?.data || [];
 
-  const books = [
-    {
-      id: 1,
-      title: 'Atomic Habits',
-      author: 'James Clear',
-      category: 'Phát triển bản thân',
-      price: '129.000đ',
-      stock: 45,
-      sold: 234,
-      status: 'active',
-    },
-    {
-      id: 2,
-      title: 'Sapiens',
-      author: 'Yuval Noah Harari',
-      category: 'Văn học',
-      price: '189.000đ',
-      stock: 12,
-      sold: 189,
-      status: 'active',
-    },
-    {
-      id: 3,
-      title: 'Rich Dad Poor Dad',
-      author: 'Robert Kiyosaki',
-      category: 'Kinh tế',
-      price: '119.000đ',
-      stock: 0,
-      sold: 456,
-      status: 'out-of-stock',
-    },
-    {
-      id: 4,
-      title: 'The Psychology of Money',
-      author: 'Morgan Housel',
-      category: 'Kinh tế',
-      price: '149.000đ',
-      stock: 67,
-      sold: 312,
-      status: 'active',
-    },
-  ];
+        const mappedBooks = booksData.map((b: any) => ({
+          id: b._id,
+          title: b.title,
+          author: b.author,
+          category: b.categoryId?.name || 'Chua phan loai',
+          categoryId: b.categoryId?._id || '',
+          price: `${(b.finalPrice || b.price || 0).toLocaleString('vi-VN')}d`,
+          rawPrice: b.price || 0,
+          stock: b.stock ?? b.quantity ?? 0,
+          sold: b.sold || 0,
+          status: (b.stock ?? b.quantity ?? 0) > 0 ? 'active' : 'out-of-stock',
+          description: b.description || '',
+          image: b.coverImage || b.images?.[0] || '',
+        }));
 
-  const orders = [
-    {
-      id: 'ORD-001',
-      customer: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      phone: '0901234567',
-      date: '18/03/2026',
-      total: '458.000đ',
-      status: 'delivered',
-      items: 3,
-      cancelRequest: false,
-      address: '123 Đường ABC, Quận 1, TP.HCM',
-      products: [
-        { name: 'Atomic Habits', quantity: 2, price: '129.000đ' },
-        { name: 'Sapiens', quantity: 1, price: '200.000đ' },
-      ],
-    },
-    {
-      id: 'ORD-002',
-      customer: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      phone: '0907654321',
-      date: '18/03/2026',
-      total: '129.000đ',
-      status: 'shipping',
-      items: 1,
-      cancelRequest: true,
-      cancelReason: 'Đặt nhầm sản phẩm, muốn đổi sang sách khác',
-      address: '456 Đường DEF, Quận 3, TP.HCM',
-      products: [
-        { name: 'Rich Dad Poor Dad', quantity: 1, price: '129.000đ' },
-      ],
-    },
-    {
-      id: 'ORD-003',
-      customer: 'Lê Văn C',
-      email: 'levanc@email.com',
-      phone: '0912345678',
-      date: '17/03/2026',
-      total: '645.000đ',
-      status: 'processing',
-      items: 5,
-      cancelRequest: true,
-      cancelReason: 'Tìm được giá rẻ hơn ở chỗ khác',
-      address: '789 Đường GHI, Quận 5, TP.HCM',
-      products: [
-        { name: 'The Psychology of Money', quantity: 3, price: '149.000đ' },
-        { name: 'Sapiens', quantity: 2, price: '198.000đ' },
-      ],
-    },
-    {
-      id: 'ORD-004',
-      customer: 'Phạm Thị D',
-      email: 'phamthid@email.com',
-      phone: '0909876543',
-      date: '17/03/2026',
-      total: '278.000đ',
-      status: 'delivered',
-      items: 2,
-      cancelRequest: false,
-      address: '321 Đường JKL, Quận 7, TP.HCM',
-      products: [
-        { name: 'Atomic Habits', quantity: 2, price: '139.000đ' },
-      ],
-    },
-  ];
+        const mappedOrders = ordersData.map((o: any) => ({
+          id: o.orderCode || o._id,
+          orderId: o._id,
+          customer: o.customerInfo?.fullName || 'Khach hang',
+          email: o.customerInfo?.email || '',
+          phone: o.customerInfo?.phone || '',
+          date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : '-',
+          total: `${(o.finalAmount || 0).toLocaleString('vi-VN')}d`,
+          status: o.status === 'completed' ? 'delivered' : o.status,
+          rawStatus: o.status,
+          items: o.items?.length || 0,
+          cancelRequest: !!o.cancelRequest,
+          cancelReason: o.cancelRequest?.reason || '',
+          address: o.customerInfo?.address
+            ? `${o.customerInfo.address.street}, ${o.customerInfo.address.district}, ${o.customerInfo.address.city}`
+            : '-',
+          products: (o.items || []).map((it: any) => ({
+            name: it.title,
+            quantity: it.quantity,
+            price: `${(it.finalPrice || it.price || 0).toLocaleString('vi-VN')}d`,
+          })),
+        }));
 
-  const customers = [
-    {
-      id: 1,
-      name: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      orders: 12,
-      total: '3.450.000đ',
-      joined: '15/01/2026',
-    },
-    {
-      id: 2,
-      name: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      orders: 8,
-      total: '2.130.000đ',
-      joined: '22/01/2026',
-    },
-    {
-      id: 3,
-      name: 'Lê Văn C',
-      email: 'levanc@email.com',
-      orders: 15,
-      total: '4.890.000đ',
-      joined: '10/02/2026',
-    },
-  ];
+        const customerMap = new Map<string, any>();
+        mappedOrders.forEach((order: any) => {
+          const key = order.email || `${order.customer}-${order.phone}`;
+          if (!customerMap.has(key)) {
+            customerMap.set(key, {
+              id: key,
+              name: order.customer,
+              email: order.email,
+              orders: 0,
+              totalValue: 0,
+              joined: order.date,
+            });
+          }
+          const current = customerMap.get(key);
+          current.orders += 1;
+          current.totalValue += Number(String(order.total).replace(/[^\d]/g, ''));
+          customerMap.set(key, current);
+        });
 
+        const mappedCustomers = Array.from(customerMap.values()).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          orders: c.orders,
+          total: `${c.totalValue.toLocaleString('vi-VN')}d`,
+          joined: c.joined,
+        }));
+
+        const totalRevenue = mappedOrders.reduce((sum: number, o: any) => sum + Number(String(o.total).replace(/[^\d]/g, '')), 0);
+
+        setStats([
+          { title: 'Tong doanh thu', value: `${(totalRevenue / 1000000).toFixed(1)}M`, change: '+0%', icon: DollarSign, color: 'bg-green-500', textColor: 'text-green-600', bgLight: 'bg-green-50' },
+          { title: 'Don hang', value: String(mappedOrders.length), change: '+0%', icon: ShoppingCart, color: 'bg-blue-500', textColor: 'text-blue-600', bgLight: 'bg-blue-50' },
+          { title: 'Khach hang', value: String(mappedCustomers.length), change: '+0%', icon: Users, textColor: 'text-purple-600', color: 'bg-purple-500', bgLight: 'bg-purple-50' },
+          { title: 'San pham', value: String(mappedBooks.length), change: '+0%', icon: Package, textColor: 'text-orange-600', color: 'bg-orange-500', bgLight: 'bg-orange-50' },
+        ]);
+
+        const monthMap = new Map<string, { month: string; revenue: number; orders: number }>();
+        mappedOrders.forEach((o: any) => {
+          const d = o.date && o.date !== '-' ? new Date(o.date.split('/').reverse().join('-')) : new Date();
+          const key = `T${d.getMonth() + 1}`;
+          if (!monthMap.has(key)) monthMap.set(key, { month: key, revenue: 0, orders: 0 });
+          const cur = monthMap.get(key)!;
+          cur.revenue += Number(String(o.total).replace(/[^\d]/g, '')) / 1000000;
+          cur.orders += 1;
+          monthMap.set(key, cur);
+        });
+        setRevenueData(Array.from(monthMap.values()).sort((a, b) => Number(a.month.slice(1)) - Number(b.month.slice(1))));
+
+        const categoryCount = new Map<string, number>();
+        mappedBooks.forEach((b: any) => {
+          categoryCount.set(b.category, (categoryCount.get(b.category) || 0) + 1);
+        });
+        const totalBooks = mappedBooks.length || 1;
+        const colors = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#06B6D4'];
+        setCategoryData(
+          Array.from(categoryCount.entries()).slice(0, 6).map(([name, count], idx) => ({
+            name,
+            value: Math.round((count / totalBooks) * 100),
+            color: colors[idx % colors.length],
+          }))
+        );
+
+        setBooks(mappedBooks);
+        setOrders(mappedOrders);
+        setCustomers(mappedCustomers);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Failed to load admin data', error);
+        toast.error('Khong tai duoc du lieu quan tri');
+      }
+    };
+
+    fetchAdminData();
+  }, []);
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'books', label: 'Quản lý sách', icon: BookOpen },
@@ -304,6 +246,133 @@ export function AdminPage() {
         return 'Hết hàng';
       default:
         return status;
+    }
+  };
+
+  const refreshAdminData = async () => {
+    try {
+      const [booksRes, ordersRes] = await Promise.all([
+        api.get('/books', { params: { page: 1, limit: 200, sortBy: 'createdAt', sortOrder: -1 } }),
+        api.get('/orders'),
+      ]);
+      const booksData = booksRes.data?.data || [];
+      const ordersData = ordersRes.data?.data || [];
+      setBooks(
+        booksData.map((b: any) => ({
+          id: b._id,
+          title: b.title,
+          author: b.author,
+          category: b.categoryId?.name || 'Chua phan loai',
+          categoryId: b.categoryId?._id || '',
+          price: `${(b.finalPrice || b.price || 0).toLocaleString('vi-VN')}d`,
+          rawPrice: b.price || 0,
+          stock: b.stock ?? b.quantity ?? 0,
+          sold: b.sold || 0,
+          status: (b.stock ?? b.quantity ?? 0) > 0 ? 'active' : 'out-of-stock',
+          description: b.description || '',
+          image: b.coverImage || b.images?.[0] || '',
+        }))
+      );
+      setOrders(
+        ordersData.map((o: any) => ({
+          id: o.orderCode || o._id,
+          orderId: o._id,
+          customer: o.customerInfo?.fullName || 'Khach hang',
+          email: o.customerInfo?.email || '',
+          phone: o.customerInfo?.phone || '',
+          date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : '-',
+          total: `${(o.finalAmount || 0).toLocaleString('vi-VN')}d`,
+          status: o.status === 'completed' ? 'delivered' : o.status,
+          rawStatus: o.status,
+          items: o.items?.length || 0,
+          cancelRequest: !!o.cancelRequest,
+          cancelReason: o.cancelRequest?.reason || '',
+          address: o.customerInfo?.address
+            ? `${o.customerInfo.address.street}, ${o.customerInfo.address.district}, ${o.customerInfo.address.city}`
+            : '-',
+          products: (o.items || []).map((it: any) => ({
+            name: it.title,
+            quantity: it.quantity,
+            price: `${(it.finalPrice || it.price || 0).toLocaleString('vi-VN')}d`,
+          })),
+        }))
+      );
+    } catch (error) {
+      console.error('Refresh failed', error);
+    }
+  };
+
+  const handleCreateBook = async () => {
+    try {
+      if (!newBook.title || !newBook.author || !newBook.category || !newBook.price) {
+        toast.error('Vui long nhap day du thong tin sach');
+        return;
+      }
+      await api.post('/books', {
+        title: newBook.title,
+        author: newBook.author,
+        categoryId: newBook.category,
+        description: newBook.description,
+        price: Number(newBook.price),
+        quantity: Number(newBook.stock || 0),
+        coverImage: newBook.image,
+      });
+      toast.success('Them sach thanh cong');
+      setShowAddBookModal(false);
+      setNewBook({ title: '', author: '', category: '', price: '', stock: '', description: '', image: '' });
+      await refreshAdminData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Them sach that bai');
+    }
+  };
+
+  const handleUpdateBook = async () => {
+    try {
+      if (!selectedBook?.id) return;
+      await api.patch(`/books/${selectedBook.id}`, {
+        title: selectedBook.title,
+        author: selectedBook.author,
+        description: selectedBook.description,
+        quantity: Number(selectedBook.stock || 0),
+        coverImage: selectedBook.image,
+      });
+      toast.success('Cap nhat sach thanh cong');
+      setShowEditBookModal(false);
+      await refreshAdminData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Cap nhat sach that bai');
+    }
+  };
+
+  const handleDeleteBook = async (bookId: string, title: string) => {
+    toast(`Xac nhan xoa sach "${title}"?`, {
+      action: {
+        label: 'Xoa',
+        onClick: async () => {
+          try {
+            await api.delete(`/books/${bookId}`);
+            toast.success('Xoa sach thanh cong');
+            await refreshAdminData();
+          } catch (error: any) {
+            toast.error(error?.response?.data?.message || 'Xoa sach that bai');
+          }
+        },
+      },
+      cancel: { label: 'Huy', onClick: () => {} },
+      duration: 8000,
+    });
+  };
+
+  const handleUpdateOrderStatus = async () => {
+    try {
+      if (!selectedOrder?.orderId || !orderStatusDraft) return;
+      await api.patch(`/orders/${selectedOrder.orderId}/status`, { status: orderStatusDraft });
+      toast.success('Cap nhat trang thai don hang thanh cong');
+      setShowOrderDetailModal(false);
+      setOrderStatusDraft('');
+      await refreshAdminData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Cap nhat trang thai that bai');
     }
   };
 
@@ -635,7 +704,7 @@ export function AdminPage() {
                             <button 
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               onClick={() => {
-                                setSelectedBook(book);
+                                setSelectedBook({ ...book, category: book.categoryId || book.category });
                                 setShowEditBookModal(true);
                               }}
                               title="Xem chi tiết"
@@ -645,7 +714,7 @@ export function AdminPage() {
                             <button 
                               className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                               onClick={() => {
-                                setSelectedBook(book);
+                                setSelectedBook({ ...book, category: book.categoryId || book.category });
                                 setShowEditBookModal(true);
                               }}
                               title="Chỉnh sửa"
@@ -655,9 +724,25 @@ export function AdminPage() {
                             <button 
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={() => {
-                                if (confirm(`Bạn có chắc muốn xóa sách "${book.title}"?`)) {
-                                  alert('Xóa sách thành công!');
-                                }
+                                toast(`Xac nhan xoa sach \"${book.title}\"?`, {
+                                  action: {
+                                    label: 'Xoa',
+                                    onClick: async () => {
+            try {
+              await api.delete(`/books/${book.id}`);
+              toast.success('Xoa sach thanh cong');
+              await refreshAdminData();
+            } catch (error: any) {
+              toast.error(error?.response?.data?.message || 'Xoa sach that bai');
+            }
+          },
+                                  },
+                                  cancel: {
+                                    label: 'Huy',
+                                    onClick: () => {},
+                                  },
+                                  duration: 8000,
+                                });
                               }}
                               title="Xóa"
                             >
@@ -751,6 +836,7 @@ export function AdminPage() {
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               onClick={() => {
                                 setSelectedOrder(order);
+                                setOrderStatusDraft(order.rawStatus || '');
                                 setShowOrderDetailModal(true);
                               }}
                               title="Xem chi tiết"
@@ -761,6 +847,7 @@ export function AdminPage() {
                               className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                               onClick={() => {
                                 setSelectedOrder(order);
+                                setOrderStatusDraft(order.rawStatus || '');
                                 setShowOrderDetailModal(true);
                               }}
                               title="Chỉnh sửa"
@@ -937,12 +1024,10 @@ export function AdminPage() {
                     onChange={(e) => setNewBook({ ...newBook, category: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
-                    <option value="">Chọn danh mục</option>
-                    <option value="Văn học">Văn học</option>
-                    <option value="Kinh tế">Kinh tế</option>
-                    <option value="Phát triển bản thân">Phát triển bản thân</option>
-                    <option value="Thiếu nhi">Thiếu nhi</option>
-                  </select>
+                    <option value="">Chon danh muc</option>
+                    {categories.map((cat) => (
+                      <option key={cat._id} value={cat._id}>{cat.name}</option>
+                    ))}                  </select>
                 </div>
                 
                 <div>
@@ -1006,7 +1091,7 @@ export function AdminPage() {
               >
                 Hủy
               </button>
-              <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
+              <button onClick={handleCreateBook} className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
                 <Plus className="w-5 h-5" />
                 Thêm sách
               </button>
@@ -1066,12 +1151,10 @@ export function AdminPage() {
                     onChange={(e) => setSelectedBook({ ...selectedBook, category: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
-                    <option value="">Chọn danh mục</option>
-                    <option value="Văn học">Văn học</option>
-                    <option value="Kinh tế">Kinh tế</option>
-                    <option value="Phát triển bản thân">Phát triển bản thân</option>
-                    <option value="Thiếu nhi">Thiếu nhi</option>
-                  </select>
+                    <option value="">Chon danh muc</option>
+                    {categories.map((cat) => (
+                      <option key={cat._id} value={cat._id}>{cat.name}</option>
+                    ))}                  </select>
                 </div>
                 
                 <div>
@@ -1135,7 +1218,7 @@ export function AdminPage() {
               >
                 Hủy
               </button>
-              <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
+              <button onClick={handleUpdateBook} className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
                 <Edit className="w-5 h-5" />
                 Lưu thay đổi
               </button>
@@ -1261,6 +1344,20 @@ export function AdminPage() {
                   <span className="text-2xl font-bold text-orange-500">{selectedOrder.total}</span>
                 </div>
               </div>
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cap nhat trang thai don hang</label>
+                <select
+                  value={orderStatusDraft}
+                  onChange={(e) => setOrderStatusDraft(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="pending">Cho xu ly</option>
+                  <option value="confirmed">Da xac nhan</option>
+                  <option value="shipping">Dang giao</option>
+                  <option value="completed">Da giao</option>
+                  <option value="cancelled">Da huy</option>
+                </select>
+              </div>
             </div>
             
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
@@ -1270,8 +1367,8 @@ export function AdminPage() {
               >
                 Đóng
               </button>
-              <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                Cập nhật trạng thái
+              <button onClick={handleUpdateOrderStatus} className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+                Cap nhat trang thai
               </button>
             </div>
           </div>
@@ -1402,3 +1499,9 @@ export function AdminPage() {
     </div>
   );
 }
+
+
+
+
+
+

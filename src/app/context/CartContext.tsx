@@ -119,7 +119,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load cart', error);
         if (!ignore) {
           setItems([]);
-          toast.error('Không thể tải giỏ hàng');
+          toast.error('Không tải được giỏ hàng. Bạn thử tải lại trang nhé.');
         }
       } finally {
         if (!ignore) {
@@ -162,7 +162,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       toast.success('Đã thêm vào giỏ hàng', { description: item.title });
     } catch (error) {
       console.error('Failed to add item to cart', error);
-      toast.error('Không thể thêm vào giỏ hàng', { description: item.title });
+      toast.error('Thêm vào giỏ hàng chưa thành công', { description: item.title });
     }
   };
 
@@ -181,7 +181,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       await loadUserCart();
     } catch (error) {
       console.error('Failed to remove cart item', error);
-      toast.error('Không thể xóa sản phẩm khỏi giỏ hàng');
+      toast.error('Xóa sản phẩm chưa thành công. Bạn thử lại nhé.');
     }
   };
 
@@ -208,7 +208,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       await loadUserCart();
     } catch (error) {
       console.error('Failed to update cart item', error);
-      toast.error('Không thể cập nhật giỏ hàng');
+      toast.error('Cập nhật giỏ hàng chưa thành công. Bạn thử lại nhé.');
     }
   };
 
@@ -224,7 +224,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems([]);
     } catch (error) {
       console.error('Failed to clear cart', error);
-      toast.error('Không thể xóa giỏ hàng');
+      toast.error('Chưa thể xóa giỏ hàng lúc này. Bạn thử lại sau nhé.');
     }
   };
 
@@ -259,3 +259,4 @@ export function useCart() {
   }
   return context;
 }
+

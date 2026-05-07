@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import api from '../utils/api';
+import { toast } from 'sonner';
 
 interface SuggestedBook {
   _id: string;
@@ -106,10 +107,12 @@ export function CartPage() {
   const applyCoupon = () => {
     if (couponCode.toUpperCase() === 'TRAMSACH2024') {
       setAppliedCoupon({ code: couponCode, discount: 50000 });
+      toast.success('Ap dung ma giam gia thanh cong');
     } else if (couponCode.toUpperCase() === 'FREESHIP') {
       setAppliedCoupon({ code: couponCode, discount: shippingFee });
+      toast.success('Ap dung ma giam gia thanh cong');
     } else {
-      alert('Mã giảm giá không hợp lệ!');
+      toast.error('Ma giam gia khong hop le');
     }
   };
 
@@ -137,48 +140,6 @@ export function CartPage() {
     });
   };
 
-  const suggestedBooks = [
-    {
-      id: 101,
-      title: 'Atomic Habits',
-      author: 'James Clear',
-      price: '129.000đ',
-      originalPrice: '180.000đ',
-      rating: 4.9,
-      image:
-        'https://images.unsplash.com/photo-1546913760-e23d946dd386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWxmJTIwaGVscCUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 102,
-      title: 'The Psychology of Money',
-      author: 'Morgan Housel',
-      price: '149.000đ',
-      originalPrice: '195.000đ',
-      rating: 4.8,
-      image:
-        'https://images.unsplash.com/photo-1768991732235-ac3e1bc9259c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGJvb2slMjBoYXJkY292ZXJ8ZW58MXx8fHwxNzczODIyMjA1fDA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 103,
-      title: 'Deep Work',
-      author: 'Cal Newport',
-      price: '139.000đ',
-      originalPrice: '175.000đ',
-      rating: 4.7,
-      image:
-        'https://images.unsplash.com/photo-1707586234446-a1338e496161?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY2FkZW1pYyUyMHRleHRib29rfGVufDF8fHx8MTc3Mzg0NzE0OXww&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-    {
-      id: 104,
-      title: 'Thinking, Fast and Slow',
-      author: 'Daniel Kahneman',
-      price: '169.000đ',
-      originalPrice: '220.000đ',
-      rating: 4.8,
-      image:
-        'https://images.unsplash.com/photo-1605263995534-995965cb88e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RpdmF0aW9uYWwlMjBib29rJTIwaW5zcGlyZXxlbnwxfHx8fDE3NzM4NDcxNDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    },
-  ];
 
   const renderSuggestedBooks = (showAddButton = false) => {
     if (suggestedLoading) {
@@ -682,3 +643,5 @@ export function CartPage() {
     </div>
   );
 }
+
+

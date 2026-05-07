@@ -23,6 +23,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { toast } from 'sonner';
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -52,6 +53,8 @@ export function CheckoutPage() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmResolver, setConfirmResolver] = useState<((value: boolean) => void) | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -63,6 +66,20 @@ export function CheckoutPage() {
     ward: '',
     note: '',
   });
+
+  const openConfirmPopup = () =>
+    new Promise<boolean>((resolve) => {
+      setConfirmResolver(() => resolve);
+      setConfirmOpen(true);
+    });
+
+  const closeConfirmPopup = (accepted: boolean) => {
+    setConfirmOpen(false);
+    if (confirmResolver) {
+      confirmResolver(accepted);
+      setConfirmResolver(null);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -142,7 +159,7 @@ export function CheckoutPage() {
 
     // Validate required fields
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district || !formData.ward) {
-      alert('Vui lòng điền đầy đủ thông tin địa chỉ');
+      toast.error('Vui long dien day du thong tin dia chi');
       return;
     }
 
@@ -163,10 +180,10 @@ export function CheckoutPage() {
       await api.post('/users/addresses', addressData);
       await fetchAddresses(); // Refresh addresses
       setShowAddressForm(false);
-      alert('Địa chỉ đã được lưu thành công');
+      toast.success('Dia chi da duoc luu thanh cong');
     } catch (error) {
       console.error('Failed to save address:', error);
-      alert('Có lỗi xảy ra khi lưu địa chỉ');
+      toast.error('Co loi xay ra khi luu dia chi');
     }
   };
 
@@ -229,10 +246,12 @@ export function CheckoutPage() {
   const applyCoupon = () => {
     if (couponCode.toUpperCase() === 'TRAMSACH2024') {
       setAppliedCoupon({ code: couponCode, discount: 50000 });
+      toast.success('Ap dung ma giam gia thanh cong');
     } else if (couponCode.toUpperCase() === 'FREESHIP') {
       setAppliedCoupon({ code: couponCode, discount: shippingFee });
+      toast.success('Ap dung ma giam gia thanh cong');
     } else {
-      alert('Mã giảm giá không hợp lệ!');
+      toast.error('Ma giam gia khong hop le');
     }
   };
 
@@ -252,33 +271,21 @@ export function CheckoutPage() {
 
     // Validate form
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district || !formData.ward) {
-      alert('Vui lòng điền đầy đủ thông tin giao hàng');
+      toast.error('Vui long dien day du thong tin giao hang');
       return;
     }
 
     if (!isAuthenticated && !formData.email) {
-      alert('Vui lòng nhập email');
+      toast.error('Vui long nhap email');
       return;
     }
 
     if (checkoutItems.length === 0) {
-      alert('Giỏ hàng trống');
+      toast.error('Gio hang trong');
       return;
     }
-
-    // Show confirmation dialog
-    const confirmMessage = `
-Thông tin đơn hàng:
-- Người nhận: ${formData.fullName}
-- SĐT: ${formData.phone}
-- Địa chỉ: ${formData.address}, ${formData.ward}, ${formData.district}, ${formData.city}
-- Tổng tiền: ${finalTotal.toLocaleString('vi-VN')}đ
-- Phương thức thanh toán: ${paymentMethods.find(p => p.id === selectedPayment)?.name}
-
-Bạn có chắc chắn muốn đặt hàng?
-    `;
-
-    if (!confirm(confirmMessage)) {
+    const accepted = await openConfirmPopup();
+    if (!accepted) {
       return;
     }
 
@@ -314,12 +321,19 @@ Bạn có chắc chắn muốn đặt hàng?
       // Clear cart after successful order
       await clearCart();
 
-      alert(`Đặt hàng thành công! Mã đơn hàng: ${order.orderCode}`);
-      navigate('/');
+      toast.success(
+        `Dat hang thanh cong. Ma tra cuu: ${order.orderCode}. Vui long kiem tra email de xem chi tiet don hang.`
+      );
+      navigate('/track-order', {
+        state: {
+          orderCode: order.orderCode,
+          successMessage: 'Don hang cua ban da duoc tao thanh cong.',
+        },
+      });
 
     } catch (error: any) {
       console.error('Order creation failed:', error);
-      alert(error.response?.data?.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+      toast.error(error.response?.data?.message || 'Co loi xay ra khi dat hang. Vui long thu lai.');
     } finally {
       setIsSubmitting(false);
     }
@@ -948,6 +962,56 @@ Bạn có chắc chắn muốn đặt hàng?
           </div>
         </div>
       </form>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+            <div className="border-b px-6 py-4">
+              <h3 className="text-xl font-bold text-gray-900">Xac nhan dat hang</h3>
+              <p className="mt-1 text-sm text-gray-600">
+                Vui long kiem tra lai thong tin truoc khi xac nhan.
+              </p>
+            </div>
+            <div className="space-y-2 px-6 py-5 text-sm text-gray-700">
+              <p>
+                <span className="font-semibold">Nguoi nhan:</span> {formData.fullName}
+              </p>
+              <p>
+                <span className="font-semibold">So dien thoai:</span> {formData.phone}
+              </p>
+              <p>
+                <span className="font-semibold">Dia chi:</span> {formData.address}, {formData.ward},{' '}
+                {formData.district}, {formData.city}
+              </p>
+              <p>
+                <span className="font-semibold">Tong tien:</span>{' '}
+                {finalTotal.toLocaleString('vi-VN')}d
+              </p>
+              <p>
+                <span className="font-semibold">Thanh toan:</span>{' '}
+                {paymentMethods.find((p) => p.id === selectedPayment)?.name}
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t px-6 py-4">
+              <button
+                type="button"
+                onClick={() => closeConfirmPopup(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Huy
+              </button>
+              <button
+                type="button"
+                onClick={() => closeConfirmPopup(true)}
+                className="rounded-lg bg-orange-500 px-4 py-2 font-medium text-white hover:bg-orange-600"
+              >
+                Xac nhan dat hang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -3,7 +3,6 @@ import { Bell, ChevronDown, Loader2, LogOut, Search, ShoppingCart, User } from '
 import { useNavigate } from 'react-router';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { LoginModal } from './LoginModal';
 import api from '../utils/api';
 
 interface SearchBook {
@@ -37,7 +36,6 @@ export function Header() {
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchBook[]>([]);
@@ -111,7 +109,7 @@ export function Header() {
     if (isAuthenticated) {
       navigate('/account');
     } else {
-      setIsLoginModalOpen(true);
+      navigate('/login');
     }
   };
 
@@ -168,7 +166,9 @@ export function Header() {
               {showSearchResults && searchQuery.trim().length >= 2 && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                   {searchLoading ? (
-                    <div className="px-4 py-5 text-sm text-gray-500">Đang tìm sách...</div>
+                    <div className="px-4 py-5 text-sm text-gray-500">
+                      Dang tim sach phu hop cho ban...
+                    </div>
                   ) : searchResults.length > 0 ? (
                     <div className="max-h-[420px] overflow-y-auto py-2">
                       {searchResults.map((book) => {
@@ -209,7 +209,7 @@ export function Header() {
                     </div>
                   ) : (
                     <div className="px-4 py-5 text-sm text-gray-500">
-                      Không tìm thấy sách phù hợp.
+                      Chua co ket qua phu hop. Thu doi tu khoa ngan gon hon nhe.
                     </div>
                   )}
                 </div>
@@ -298,8 +298,7 @@ export function Header() {
           </div>
         </div>
       </div>
-
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </header>
   );
 }
+

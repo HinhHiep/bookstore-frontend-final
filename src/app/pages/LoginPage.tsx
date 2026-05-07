@@ -23,7 +23,7 @@ export function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      setError(err.response?.data?.message || 'Dang nhap chua thanh cong. Ban vui long kiem tra email va mat khau.');
     } finally {
       setLoading(false);
     }
@@ -138,3 +138,4 @@ export function LoginPage() {
     </div>
   );
 }
+
