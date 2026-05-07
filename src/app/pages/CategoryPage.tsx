@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   ChevronRight,
@@ -19,6 +19,7 @@ import {
   Award,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import api from '../utils/api';
 
 interface Category {
   id: string;
@@ -117,129 +118,88 @@ export function CategoryPage() {
 
   const currentSubCategories = subCategories[category || 'van-hoc'] || subCategories['van-hoc'];
 
-  // Mock books data
-  const books = [
-    {
-      id: 1,
-      title: 'Nhà Giả Kim',
-      author: 'Paulo Coelho',
-      price: '89.000đ',
-      originalPrice: '129.000đ',
-      discount: 31,
-      rating: 4.8,
-      reviews: 2543,
-      sold: 5234,
-      image: 'https://images.unsplash.com/photo-1761319115156-d758b22ed57b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsaXRlcmF0dXJlJTIwY2xhc3NpYyUyMGJvb2tzfGVufDF8fHx8MTc3Mzg0OTU1MXww&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'van-hoc',
-      badge: 'BEST SELLER',
-      isNew: false,
-    },
-    {
-      id: 2,
-      title: 'Đắc Nhân Tâm',
-      author: 'Dale Carnegie',
-      price: '79.000đ',
-      originalPrice: '109.000đ',
-      discount: 27,
-      rating: 4.9,
-      reviews: 3421,
-      sold: 8765,
-      image: 'https://images.unsplash.com/photo-1546913760-e23d946dd386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWxmJTIwaGVscCUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'phat-trien-ban-than',
-      badge: 'HOT',
-      isNew: false,
-    },
-    {
-      id: 3,
-      title: 'Tuổi Trẻ Đáng Giá Bao Nhiêu',
-      author: 'Rosie Nguyễn',
-      price: '69.000đ',
-      originalPrice: '99.000đ',
-      discount: 30,
-      rating: 4.7,
-      reviews: 1876,
-      sold: 4321,
-      image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwcmVhZGluZ3xlbnwxfHx8fDE3NzM4NDcwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'phat-trien-ban-than',
-      badge: 'NEW',
-      isNew: true,
-    },
-    {
-      id: 4,
-      title: 'Sapiens: Lược Sử Loài Người',
-      author: 'Yuval Noah Harari',
-      price: '189.000đ',
-      originalPrice: '249.000đ',
-      discount: 24,
-      rating: 4.8,
-      reviews: 2134,
-      sold: 3456,
-      image: 'https://images.unsplash.com/photo-1768224946689-b599f1d406f0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwb3B1bGFyJTIwYm9va3MlMjBzdGFja3xlbnwxfHx8fDE3NzM4NDkzMjJ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'van-hoc',
-      badge: null,
-      isNew: false,
-    },
-    {
-      id: 5,
-      title: 'Think and Grow Rich',
-      author: 'Napoleon Hill',
-      price: '129.000đ',
-      originalPrice: '169.000đ',
-      discount: 24,
-      rating: 4.6,
-      reviews: 1543,
-      sold: 2876,
-      image: 'https://images.unsplash.com/photo-1747037632512-3bea94e6e618?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGVjb25vbWljcyUyMGJvb2tzfGVufDF8fHx8MTc3Mzg0OTU1MXww&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'kinh-te',
-      badge: null,
-      isNew: false,
-    },
-    {
-      id: 6,
-      title: 'Doraemon Tập 1',
-      author: 'Fujiko F. Fujio',
-      price: '25.000đ',
-      originalPrice: '35.000đ',
-      discount: 29,
-      rating: 4.9,
-      reviews: 5432,
-      sold: 9876,
-      image: 'https://images.unsplash.com/photo-1705660800046-2113f479369a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGlsZHJlbiUyMGJvb2tzJTIwY29sb3JmdWx8ZW58MXx8fHwxNzczODQzNjIzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'thieu-nhi',
-      badge: 'BEST SELLER',
-      isNew: false,
-    },
-    {
-      id: 7,
-      title: 'The 4-Hour Workweek',
-      author: 'Tim Ferriss',
-      price: '149.000đ',
-      originalPrice: '199.000đ',
-      discount: 25,
-      rating: 4.5,
-      reviews: 987,
-      sold: 1234,
-      image: 'https://images.unsplash.com/photo-1592496431122-2349e0fbc666?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaW5hbmNlJTIwYm9va3xlbnwxfHx8fDE3NzM4NDcwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'kinh-te',
-      badge: 'NEW',
-      isNew: true,
-    },
-    {
-      id: 8,
-      title: 'Mắt Biếc',
-      author: 'Nguyễn Nhật Ánh',
-      price: '69.000đ',
-      originalPrice: '89.000đ',
-      discount: 22,
-      rating: 4.8,
-      reviews: 4321,
-      sold: 7654,
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaWN0aW9uJTIwYm9va3xlbnwxfHx8fDE3NzM4NDcwMDF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      category: 'van-hoc',
-      badge: 'HOT',
-      isNew: false,
-    },
-  ];
+  interface CategoryBook {
+    _id: string;
+    title: string;
+    author: string;
+    price: number;
+    discountPrice?: number | null;
+    rating?: number;
+    reviewCount?: number;
+    sold?: number;
+    coverImage?: string;
+    images?: string[];
+    isNewArrival?: boolean;
+    isDiscount?: boolean;
+  }
+
+  const [books, setBooks] = useState<CategoryBook[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(true);
+  const [categoryData, setCategoryData] = useState<{ _id: string; name: string; slug: string; description?: string } | null>(null);
+  const [categoryNotFound, setCategoryNotFound] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const displayCategory = {
+    ...currentCategory,
+    name: categoryData?.name || currentCategory.name,
+    description: categoryData?.description || currentCategory.description,
+  };
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(value);
+  }
+
+  useEffect(() => {
+    const loadCategoryBooks = async () => {
+      if (!category) {
+        setBooks([]);
+        setLoadingBooks(false);
+        return;
+      }
+
+      setLoadingBooks(true);
+      setCategoryNotFound(false);
+      setErrorMessage('');
+
+      try {
+        const categoryResponse = await api.get(`/categories/slug/${category}`);
+        const categoryInfo = categoryResponse.data.data;
+        setCategoryData(categoryInfo);
+
+        const booksResponse = await api.get('/books', {
+          params: {
+            categoryId: categoryInfo._id,
+            page: 1,
+            limit: 24,
+          },
+        });
+
+        setBooks(booksResponse.data.data || booksResponse.data || []);
+      } catch (error) {
+        console.error('Failed to load category books', error);
+        const status = (error as any)?.response?.status;
+        if (status === 404) {
+          setCategoryNotFound(true);
+        } else {
+          setErrorMessage('Không thể tải dữ liệu. Vui lòng thử lại sau.');
+        }
+        setBooks([]);
+      } finally {
+        setLoadingBooks(false);
+      }
+    };
+
+    loadCategoryBooks();
+  }, [category]);
+
+  const categoryId = categoryData?._id || '';
+
+  const currentCategoryWithDisplay = displayCategory;
+
+  const booksLoaded = !loadingBooks && !categoryNotFound && !errorMessage;
 
   const priceRanges = [
     { id: 'all', name: 'Tất cả mức giá' },
@@ -259,7 +219,7 @@ export function CategoryPage() {
     { id: 'newest', name: 'Mới nhất' },
   ];
 
-  const CategoryIcon = currentCategory.icon;
+  const CategoryIcon = currentCategoryWithDisplay.icon;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -282,14 +242,14 @@ export function CategoryPage() {
             </button>
             <ChevronRight className="w-4 h-4 text-gray-400" />
             <span className="text-orange-600 font-medium">
-              {currentCategory.name}
+              {currentCategoryWithDisplay.name}
             </span>
           </div>
         </div>
       </div>
 
       {/* Category Hero */}
-      <div className={`bg-gradient-to-r ${currentCategory.color} text-white`}>
+      <div className={`bg-gradient-to-r ${currentCategoryWithDisplay.color} text-white`}>
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="grid grid-cols-12 gap-8 items-center">
             <div className="col-span-8">
@@ -298,14 +258,14 @@ export function CategoryPage() {
                   <CategoryIcon className="w-9 h-9" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold mb-2">{currentCategory.name}</h1>
-                  <p className="text-lg opacity-90">{currentCategory.description}</p>
+                  <h1 className="text-4xl font-bold mb-2">{currentCategoryWithDisplay.name}</h1>
+                  <p className="text-lg opacity-90">{currentCategoryWithDisplay.description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-6 mt-6">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5" />
-                  <span>{currentCategory.bookCount.toLocaleString()} sách</span>
+                  <span>{currentCategoryWithDisplay.bookCount.toLocaleString()} sách</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Tag className="w-5 h-5" />
@@ -320,8 +280,8 @@ export function CategoryPage() {
             <div className="col-span-4">
               <div className="relative">
                 <img
-                  src={currentCategory.image}
-                  alt={currentCategory.name}
+                  src={currentCategoryWithDisplay.image}
+                  alt={currentCategoryWithDisplay.name}
                   className="w-full h-64 object-cover rounded-2xl shadow-2xl"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-2xl"></div>
@@ -559,11 +519,11 @@ export function CategoryPage() {
             </div>
 
             {/* Featured Banner */}
-            <div className={`bg-gradient-to-br ${currentCategory.color} rounded-xl p-6 text-white`}>
+            <div className={`bg-gradient-to-br ${currentCategoryWithDisplay.color} rounded-xl p-6 text-white`}>
               <CategoryIcon className="w-12 h-12 mb-4 opacity-80" />
               <h3 className="font-bold text-lg mb-2">Khuyến mãi đặc biệt!</h3>
               <p className="text-sm opacity-90 mb-4">
-                Giảm giá đến 35% cho tất cả sách trong danh mục {currentCategory.name}
+                Giảm giá đến 35% cho tất cả sách trong danh mục {currentCategoryWithDisplay.name}
               </p>
               <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm">
                 <Tag className="w-4 h-4" />
@@ -576,42 +536,44 @@ export function CategoryPage() {
           <div className="col-span-9">
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-3 gap-6">
-                {books.map((book) => (
-                  <div
-                    key={book.id}
-                    className="bg-white rounded-xl shadow-sm border hover:shadow-xl transition-all group overflow-hidden"
-                  >
+                {books.map((book) => {
+                  const imageSrc = book.coverImage || book.images?.[0] || `https://picsum.photos/seed/${book._id}/360/480`;
+                  const displayPrice = book.discountPrice ?? book.price;
+                  const originalPrice = book.discountPrice ? book.price : null;
+                  const discountPercent = originalPrice ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100) : 0;
+                  const reviews = book.reviewCount ?? 0;
+                  const ratingValue = book.rating ?? 0;
+
+                  return (
+                    <div
+                      key={book._id}
+                      className="bg-white rounded-xl shadow-sm border hover:shadow-xl transition-all group overflow-hidden"
+                    >
                     {/* Book Image */}
                     <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
                       <img
-                        src={book.image}
+                        src={imageSrc}
                         alt={book.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
 
                       {/* Badges */}
-                      {book.badge && (
-                        <div className="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                          {book.badge}
-                        </div>
-                      )}
-
-                      {book.isNew && (
+                      {book.isNewArrival && (
                         <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                           MỚI
                         </div>
                       )}
 
-                      {book.discount && (
+                      {discountPercent > 0 && (
                         <div className="absolute top-3 right-3 bg-red-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-                          -{book.discount}%
+                          -{discountPercent}%
                         </div>
                       )}
 
                       {/* Quick Actions */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <button
-                          onClick={() => navigate(`/book/${book.id}`)}
+                          onClick={() => navigate(`/book/${book._id}`)}
                           className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all transform hover:scale-110"
                         >
                           <Eye className="w-5 h-5" />
@@ -629,20 +591,20 @@ export function CategoryPage() {
                           <Star
                             key={i}
                             className={`w-4 h-4 ${
-                              i < Math.floor(book.rating)
+                              i < Math.floor(ratingValue)
                                 ? 'fill-yellow-400 text-yellow-400'
                                 : 'text-gray-300'
                             }`}
                           />
                         ))}
                         <span className="text-sm text-gray-600 ml-1">
-                          ({book.reviews})
+                          ({reviews})
                         </span>
                       </div>
 
                       <h3
                         className="font-bold text-gray-900 mb-1 line-clamp-2 cursor-pointer hover:text-orange-600 transition-colors"
-                        onClick={() => navigate(`/book/${book.id}`)}
+                        onClick={() => navigate(`/book/${book._id}`)}
                       >
                         {book.title}
                       </h3>
@@ -650,11 +612,11 @@ export function CategoryPage() {
 
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xl font-bold text-orange-600">
-                          {book.price}
+                          {formatCurrency(displayPrice)}
                         </span>
-                        {book.originalPrice && (
+                        {originalPrice && (
                           <span className="text-sm text-gray-400 line-through">
-                            {book.originalPrice}
+                            {formatCurrency(originalPrice)}
                           </span>
                         )}
                       </div>
@@ -662,11 +624,11 @@ export function CategoryPage() {
                       <button
                         onClick={() =>
                           addToCart({
-                            id: book.id,
+                            id: book._id,
                             title: book.title,
                             author: book.author,
-                            price: book.price,
-                            image: book.image,
+                            price: formatCurrency(displayPrice),
+                            image: imageSrc,
                             quantity: 1,
                           })
                         }
@@ -677,29 +639,39 @@ export function CategoryPage() {
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             ) : (
               <div className="space-y-4">
-                {books.map((book) => (
+                {books.map((book) => {
+                  const imageSrc = book.coverImage || book.images?.[0] || `https://picsum.photos/seed/${book._id}/360/480`;
+                  const displayPrice = book.discountPrice ?? book.price;
+                  const originalPrice = book.discountPrice ? book.price : null;
+                  const discountPercent = originalPrice ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100) : 0;
+                  const reviews = book.reviewCount ?? 0;
+                  const ratingValue = book.rating ?? 0;
+                  const soldCount = book.sold ?? 0;
+
+                  return (
                   <div
-                    key={book.id}
+                    key={book._id}
                     className="bg-white rounded-xl shadow-sm border hover:shadow-lg transition-all p-4 flex gap-4"
                   >
                     <div className="w-32 h-44 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 relative">
                       <img
-                        src={book.image}
+                        src={imageSrc}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />
-                      {book.badge && (
-                        <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                          {book.badge}
+                      {book.isNewArrival && (
+                        <div className="absolute top-2 left-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                          MỚI
                         </div>
                       )}
-                      {book.discount && (
+                      {discountPercent > 0 && (
                         <div className="absolute top-2 right-2 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold">
-                          -{book.discount}%
+                          -{discountPercent}%
                         </div>
                       )}
                     </div>
@@ -709,7 +681,7 @@ export function CategoryPage() {
                         <div className="flex-1">
                           <h3
                             className="text-xl font-bold text-gray-900 mb-1 cursor-pointer hover:text-orange-600 transition-colors"
-                            onClick={() => navigate(`/book/${book.id}`)}
+                            onClick={() => navigate(`/book/${book._id}`)}
                           >
                             {book.title}
                           </h3>
@@ -721,7 +693,7 @@ export function CategoryPage() {
                                 <Star
                                   key={i}
                                   className={`w-4 h-4 ${
-                                    i < Math.floor(book.rating)
+                                    i < ratingValue
                                       ? 'fill-yellow-400 text-yellow-400'
                                       : 'text-gray-300'
                                   }`}
@@ -729,22 +701,22 @@ export function CategoryPage() {
                               ))}
                             </div>
                             <span className="text-sm text-gray-600">
-                              {book.rating} ({book.reviews} đánh giá)
+                              {ratingValue.toFixed(1)} ({reviews} đánh giá)
                             </span>
                           </div>
 
                           <div className="text-sm text-gray-500">
-                            Đã bán {book.sold.toLocaleString()} sản phẩm
+                            Đã bán {soldCount.toLocaleString()} sản phẩm
                           </div>
                         </div>
 
                         <div className="text-right">
                           <div className="text-2xl font-bold text-orange-600 mb-1">
-                            {book.price}
+                            {formatCurrency(displayPrice)}
                           </div>
-                          {book.originalPrice && (
+                          {originalPrice && (
                             <div className="text-sm text-gray-400 line-through mb-2">
-                              {book.originalPrice}
+                              {formatCurrency(originalPrice)}
                             </div>
                           )}
                         </div>
@@ -754,11 +726,11 @@ export function CategoryPage() {
                         <button
                           onClick={() =>
                             addToCart({
-                              id: book.id,
+                              id: book._id,
                               title: book.title,
                               author: book.author,
-                              price: book.price,
-                              image: book.image,
+                              price: formatCurrency(displayPrice),
+                              image: imageSrc,
                               quantity: 1,
                             })
                           }
@@ -768,7 +740,7 @@ export function CategoryPage() {
                           Thêm vào giỏ
                         </button>
                         <button
-                          onClick={() => navigate(`/book/${book.id}`)}
+                          onClick={() => navigate(`/book/${book._id}`)}
                           className="px-6 py-2.5 border-2 border-orange-500 text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-colors"
                         >
                           Xem chi tiết
@@ -779,7 +751,8 @@ export function CategoryPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
 

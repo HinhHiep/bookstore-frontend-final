@@ -14,7 +14,7 @@ interface Book {
   rating?: number;
   reviewCount?: number;
   coverImage?: string;
-  isNew?: boolean;
+  isNewArrival?: boolean;
 }
 
 type TabConfig = {
@@ -174,7 +174,7 @@ export function BookFinder() {
                       alt={book.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
-                    {book.isNew && (
+                    {book.isNewArrival && (
                       <div className="absolute top-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                         <span className="w-1.5 h-1.5 bg-white rounded-full" />
                         Mới

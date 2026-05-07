@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (name: string, email: string, password: string) => Promise<void>;
   verifyEmail: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     
     setUser(userData);
+    return userData;
   };
 
   const register = async (name: string, email: string, password: string) => {

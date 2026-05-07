@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Search,
@@ -9,67 +9,67 @@ import {
   Clock,
   MapPin,
   Phone,
-  Mail,
   CreditCard,
-  Calendar,
   User,
   MessageCircle,
   Download,
   Star,
   ChevronRight,
-  AlertCircle,
   Box,
   ClipboardCheck,
   PackageCheck,
 } from 'lucide-react';
+import api from '../utils/api';
+
+const statusStepIndex: Record<string, number> = {
+  pending: 0,
+  confirmed: 2,
+  shipping: 3,
+  completed: 4,
+  cancelled: 0,
+};
+
+const statusTextMap: Record<string, string> = {
+  pending: 'Chờ xử lý',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang vận chuyển',
+  completed: 'Giao hàng thành công',
+  cancelled: 'Đã hủy',
+};
 
 export function TrackOrderPage() {
   const navigate = useNavigate();
   const [orderCode, setOrderCode] = useState('');
   const [showTracking, setShowTracking] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState(3); // 0-4 for 5 statuses
+  const [currentStatus, setCurrentStatus] = useState(0);
+  const [orderData, setOrderData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Mock order data
-  const orderData = {
-    id: '#DH001235',
-    date: '12/03/2026',
-    status: 'shipping',
-    estimatedDelivery: '15/03/2026',
-    total: '320.000đ',
-    paymentMethod: 'COD',
-    customer: {
-      name: 'Nguyễn Văn A',
-      phone: '0912345678',
-      email: 'nguyenvana@email.com',
-      address: '123 Đường ABC, Phường 1, Quận 1, TP.HCM',
-    },
-    items: [
-      {
-        id: 1,
-        title: 'Atomic Habits',
-        author: 'James Clear',
-        price: '129.000đ',
-        quantity: 1,
-        image:
-          'https://images.unsplash.com/photo-1546913760-e23d946dd386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzZWxmJTIwaGVscCUyMGJvb2t8ZW58MXx8fHwxNzczODQ3MDAxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      },
-      {
-        id: 2,
-        title: 'The Psychology of Money',
-        author: 'Morgan Housel',
-        price: '149.000đ',
-        quantity: 1,
-        image:
-          'https://images.unsplash.com/photo-1768991732235-ac3e1bc9259c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGJvb2slMjBoYXJkY292ZXJ8ZW58MXx8fHwxNzczODIyMjA1fDA&ixlib=rb-4.1.0&q=80&w=1080',
-      },
-    ],
-    shippingFee: 30000,
-    discount: 0,
-    courier: {
-      name: 'Nguyễn Văn B',
-      phone: '0987654321',
-      company: 'Giao Hàng Nhanh',
-    },
+  const formatMoney = (value: number | string | undefined) => {
+    const amount = typeof value === 'string'
+      ? parseFloat(value.replace(/[^\d.-]/g, ''))
+      : typeof value === 'number'
+      ? value
+      : 0;
+
+    return amount.toLocaleString('vi-VN') + 'đ';
+  };
+
+  const getStatusText = (status: string) => statusTextMap[status] || 'Đang cập nhật';
+
+  const getStatusIndex = (status: string) => statusStepIndex[status] ?? 0;
+
+  const getFormattedDate = (value?: string | number | Date) => {
+    if (!value) return 'Đang cập nhật';
+    const date = new Date(value);
+    return date.toLocaleDateString('vi-VN');
+  };
+
+  const getEstimatedDelivery = (value?: string | number | Date) => {
+    if (!value) return 'Đang cập nhật';
+    const date = new Date(value).getTime() + 3 * 24 * 60 * 60 * 1000;
+    return new Date(date).toLocaleDateString('vi-VN');
   };
 
   const trackingSteps = [
@@ -77,7 +77,7 @@ export function TrackOrderPage() {
       id: 0,
       title: 'Đơn hàng đã đặt',
       description: 'Đơn hàng đã được tạo thành công',
-      time: '12/03/2026 - 10:30',
+      time: orderData?.createdAt ? `${getFormattedDate(orderData.createdAt)} - 10:30` : '',
       icon: ClipboardCheck,
       color: 'bg-green-500',
     },
@@ -85,7 +85,7 @@ export function TrackOrderPage() {
       id: 1,
       title: 'Đã xác nhận',
       description: 'Đơn hàng đã được xác nhận và đang chờ đóng gói',
-      time: '12/03/2026 - 11:00',
+      time: orderData?.status === 'confirmed' ? `${getFormattedDate(orderData.createdAt)} - 11:00` : '',
       icon: CheckCircle2,
       color: 'bg-green-500',
     },
@@ -93,7 +93,7 @@ export function TrackOrderPage() {
       id: 2,
       title: 'Đang đóng gói',
       description: 'Đơn hàng đang được đóng gói tại kho',
-      time: '12/03/2026 - 14:30',
+      time: orderData?.status === 'confirmed' ? `${getFormattedDate(orderData.createdAt)} - 14:30` : '',
       icon: Box,
       color: 'bg-green-500',
     },
@@ -101,7 +101,7 @@ export function TrackOrderPage() {
       id: 3,
       title: 'Đang vận chuyển',
       description: 'Đơn hàng đang được giao đến bạn',
-      time: '13/03/2026 - 08:00',
+      time: orderData?.status === 'shipping' ? `${getFormattedDate(orderData.createdAt)} - 08:00` : '',
       icon: Truck,
       color: 'bg-orange-500',
     },
@@ -109,16 +109,40 @@ export function TrackOrderPage() {
       id: 4,
       title: 'Giao hàng thành công',
       description: 'Đơn hàng đã được giao thành công',
-      time: '',
+      time: orderData?.status === 'completed' ? getEstimatedDelivery(orderData.createdAt) : '',
       icon: PackageCheck,
       color: 'bg-gray-300',
     },
   ];
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (orderCode.trim()) {
+
+    const code = orderCode.trim().replace(/^#/, '');
+    if (!code) {
+      setError('Vui lòng nhập mã đơn hàng');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await api.get(`/orders/code/${encodeURIComponent(code)}`);
+      const order = response.data?.data;
+      if (!order) {
+        throw new Error('Không tìm thấy đơn hàng');
+      }
+
+      setOrderData(order);
+      setCurrentStatus(getStatusIndex(order.status));
       setShowTracking(true);
+    } catch (err: any) {
+      setShowTracking(false);
+      setOrderData(null);
+      setError(err?.response?.data?.message || err?.message || 'Không tìm thấy đơn hàng');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -126,20 +150,16 @@ export function TrackOrderPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
         <div className="max-w-4xl mx-auto px-4 py-16">
-          {/* Header */}
           <div className="text-center mb-12">
             <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
               <Package className="w-12 h-12 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Tra cứu đơn hàng
-            </h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Tra cứu đơn hàng</h1>
             <p className="text-lg text-gray-600">
               Nhập mã đơn hàng để theo dõi tình trạng giao hàng của bạn
             </p>
           </div>
 
-          {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-12">
             <div className="bg-white rounded-2xl shadow-2xl p-8">
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -158,28 +178,27 @@ export function TrackOrderPage() {
                 </div>
                 <button
                   type="submit"
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2"
+                  disabled={loading}
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Search className="w-5 h-5" />
-                  Tra cứu
+                  {loading ? 'Đang tìm...' : 'Tra cứu'}
                 </button>
               </div>
+              {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
               <p className="text-sm text-gray-500 mt-3">
                 Bạn có thể tìm mã đơn hàng trong email xác nhận hoặc tin nhắn SMS
               </p>
             </div>
           </form>
 
-          {/* Info Cards */}
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Truck className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="font-bold text-gray-900 mb-2">Giao hàng nhanh</h3>
-              <p className="text-sm text-gray-600">
-                Giao hàng trong 2-3 ngày làm việc
-              </p>
+              <p className="text-sm text-gray-600">Giao hàng trong 2-3 ngày làm việc</p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
@@ -187,9 +206,7 @@ export function TrackOrderPage() {
                 <PackageCheck className="w-8 h-8 text-green-600" />
               </div>
               <h3 className="font-bold text-gray-900 mb-2">Theo dõi realtime</h3>
-              <p className="text-sm text-gray-600">
-                Cập nhật trạng thái đơn hàng liên tục
-              </p>
+              <p className="text-sm text-gray-600">Cập nhật trạng thái đơn hàng liên tục</p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
@@ -197,13 +214,10 @@ export function TrackOrderPage() {
                 <MessageCircle className="w-8 h-8 text-orange-600" />
               </div>
               <h3 className="font-bold text-gray-900 mb-2">Hỗ trợ 24/7</h3>
-              <p className="text-sm text-gray-600">
-                Luôn sẵn sàng hỗ trợ bạn mọi lúc
-              </p>
+              <p className="text-sm text-gray-600">Luôn sẵn sàng hỗ trợ bạn mọi lúc</p>
             </div>
           </div>
 
-          {/* Quick Links */}
           <div className="mt-12 bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-bold text-gray-900 mb-4">Liên kết nhanh</h3>
             <div className="space-y-2">
@@ -213,9 +227,7 @@ export function TrackOrderPage() {
               >
                 <div className="flex items-center gap-3">
                   <User className="w-5 h-5 text-gray-600 group-hover:text-orange-600" />
-                  <span className="font-medium text-gray-900">
-                    Xem tất cả đơn hàng
-                  </span>
+                  <span className="font-medium text-gray-900">Xem tất cả đơn hàng</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600" />
               </button>
@@ -225,9 +237,7 @@ export function TrackOrderPage() {
               >
                 <div className="flex items-center gap-3">
                   <Package className="w-5 h-5 text-gray-600 group-hover:text-orange-600" />
-                  <span className="font-medium text-gray-900">
-                    Tiếp tục mua sắm
-                  </span>
+                  <span className="font-medium text-gray-900">Tiếp tục mua sắm</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600" />
               </button>
@@ -240,7 +250,6 @@ export function TrackOrderPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with search */}
       <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -267,16 +276,15 @@ export function TrackOrderPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Order Header */}
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-lg p-8 mb-8 text-white">
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-sm opacity-90 mb-2">Mã đơn hàng</div>
-              <div className="text-3xl font-bold">{orderData.id}</div>
+              <div className="text-3xl font-bold">{orderData?.orderCode}</div>
             </div>
             <div className="text-right">
               <div className="text-sm opacity-90 mb-2">Ngày đặt hàng</div>
-              <div className="text-xl font-bold">{orderData.date}</div>
+              <div className="text-xl font-bold">{getFormattedDate(orderData?.createdAt)}</div>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -286,27 +294,22 @@ export function TrackOrderPage() {
               </div>
               <div>
                 <div className="text-sm opacity-90">Trạng thái</div>
-                <div className="text-xl font-bold">Đang vận chuyển</div>
+                <div className="text-xl font-bold">{getStatusText(orderData?.status)}</div>
               </div>
             </div>
             <div className="text-right">
               <div className="text-sm opacity-90">Dự kiến giao hàng</div>
-              <div className="text-xl font-bold">{orderData.estimatedDelivery}</div>
+              <div className="text-xl font-bold">{getEstimatedDelivery(orderData?.createdAt)}</div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-12 gap-8">
-          {/* Left Column */}
           <div className="col-span-8 space-y-8">
-            {/* Tracking Timeline */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8">
-                Lộ trình vận chuyển
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-8">Lộ trình vận chuyển</h2>
 
               <div className="relative">
-                {/* Progress Line */}
                 <div className="absolute left-6 top-0 bottom-0 w-1 bg-gray-200"></div>
                 <div
                   className="absolute left-6 top-0 w-1 bg-orange-500 transition-all duration-500"
@@ -325,20 +328,14 @@ export function TrackOrderPage() {
                       <div key={step.id} className="relative flex gap-6">
                         <div
                           className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${
-                            isActive
-                              ? step.color
-                              : 'bg-gray-200'
+                            isActive ? step.color : 'bg-gray-200'
                           } ${isCurrent ? 'ring-4 ring-orange-200' : ''}`}
                         >
                           <Icon className="w-6 h-6 text-white" />
                         </div>
                         <div className="flex-1 pt-1">
                           <div className="flex items-center justify-between mb-2">
-                            <h3
-                              className={`text-lg font-bold ${
-                                isActive ? 'text-gray-900' : 'text-gray-400'
-                              }`}
-                            >
+                            <h3 className={`text-lg font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                               {step.title}
                             </h3>
                             {step.time && (
@@ -348,11 +345,7 @@ export function TrackOrderPage() {
                               </div>
                             )}
                           </div>
-                          <p
-                            className={`${
-                              isActive ? 'text-gray-600' : 'text-gray-400'
-                            }`}
-                          >
+                          <p className={`${isActive ? 'text-gray-600' : 'text-gray-400'}`}>
                             {step.description}
                           </p>
                           {isCurrent && (
@@ -369,76 +362,57 @@ export function TrackOrderPage() {
               </div>
             </div>
 
-            {/* Order Items */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Sản phẩm ({orderData.items.length})
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Sản phẩm ({orderData?.items?.length ?? 0})</h2>
 
               <div className="space-y-4">
-                {orderData.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-4 p-4 bg-gray-50 rounded-xl"
-                  >
-                    <div className="w-20 h-28 rounded-lg overflow-hidden flex-shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 mb-1">
-                        {item.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-2">{item.author}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
-                          Số lượng: {item.quantity}
-                        </span>
-                        <span className="font-bold text-orange-600">
-                          {item.price}
-                        </span>
+                {orderData?.items?.map((item: any) => {
+                  const itemPrice = item.finalPrice ?? item.price;
+                  const itemTotal = item.total ?? itemPrice * item.quantity;
+
+                  return (
+                    <div key={item.bookId ?? item.title} className="flex gap-4 p-4 bg-gray-50 rounded-xl">
+                      <div className="w-20 h-28 rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src={item.thumbnail || 'https://via.placeholder.com/120?text=Book'}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-1">{item.title}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{formatMoney(itemPrice)} x {item.quantity}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Tổng: {formatMoney(itemTotal)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="mt-6 pt-6 border-t space-y-3">
                 <div className="flex items-center justify-between text-gray-600">
                   <span>Tạm tính</span>
                   <span className="font-medium">
-                    {orderData.items
-                      .reduce(
-                        (sum, item) =>
-                          sum +
-                          parseFloat(item.price.replace(/[^\d]/g, '')) *
-                            item.quantity,
-                        0
-                      )
-                      .toLocaleString('vi-VN')}
-                    đ
+                    {formatMoney(
+                      orderData?.items?.reduce((sum: number, item: any) => sum + (item.total ?? (item.finalPrice ?? item.price) * item.quantity), 0) ?? 0
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-gray-600">
                   <span>Phí vận chuyển</span>
-                  <span className="font-medium">
-                    {orderData.shippingFee.toLocaleString('vi-VN')}đ
-                  </span>
+                  <span className="font-medium">{formatMoney(orderData?.shippingFee ?? 0)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xl font-bold text-gray-900 pt-3 border-t">
                   <span>Tổng cộng</span>
-                  <span className="text-orange-600">{orderData.total}</span>
+                  <span className="text-orange-600">{formatMoney(orderData?.finalAmount ?? 0)}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column */}
           <div className="col-span-4 space-y-6">
-            {/* Courier Info */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -452,9 +426,7 @@ export function TrackOrderPage() {
                   <User className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Người giao hàng</div>
-                    <div className="font-medium text-gray-900">
-                      {orderData.courier.name}
-                    </div>
+                    <div className="font-medium text-gray-900">{orderData?.courier?.name ?? 'Đội ngũ giao hàng'}</div>
                   </div>
                 </div>
 
@@ -462,9 +434,7 @@ export function TrackOrderPage() {
                   <Package className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Đơn vị vận chuyển</div>
-                    <div className="font-medium text-gray-900">
-                      {orderData.courier.company}
-                    </div>
+                    <div className="font-medium text-gray-900">{orderData?.courier?.company ?? 'Đơn vị vận chuyển'}</div>
                   </div>
                 </div>
 
@@ -472,11 +442,8 @@ export function TrackOrderPage() {
                   <Phone className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Số điện thoại</div>
-                    <a
-                      href={`tel:${orderData.courier.phone}`}
-                      className="font-medium text-orange-600 hover:text-orange-700"
-                    >
-                      {orderData.courier.phone}
+                    <a href={`tel:${orderData?.courier?.phone ?? '0987654321'}`} className="font-medium text-orange-600 hover:text-orange-700">
+                      {orderData?.courier?.phone ?? '0987654321'}
                     </a>
                   </div>
                 </div>
@@ -488,7 +455,6 @@ export function TrackOrderPage() {
               </button>
             </div>
 
-            {/* Delivery Address */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -502,9 +468,7 @@ export function TrackOrderPage() {
                   <User className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Người nhận</div>
-                    <div className="font-medium text-gray-900">
-                      {orderData.customer.name}
-                    </div>
+                    <div className="font-medium text-gray-900">{orderData?.customerInfo?.fullName}</div>
                   </div>
                 </div>
 
@@ -512,9 +476,7 @@ export function TrackOrderPage() {
                   <Phone className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Số điện thoại</div>
-                    <div className="font-medium text-gray-900">
-                      {orderData.customer.phone}
-                    </div>
+                    <div className="font-medium text-gray-900">{orderData?.customerInfo?.phone}</div>
                   </div>
                 </div>
 
@@ -523,14 +485,21 @@ export function TrackOrderPage() {
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Địa chỉ</div>
                     <div className="font-medium text-gray-900">
-                      {orderData.customer.address}
+                      {[
+                        orderData?.customerInfo?.address?.street,
+                        orderData?.customerInfo?.address?.ward,
+                        orderData?.customerInfo?.address?.district,
+                        orderData?.customerInfo?.address?.city,
+                        orderData?.customerInfo?.address?.country,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Payment Info */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -542,14 +511,17 @@ export function TrackOrderPage() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <span className="text-gray-600">Phương thức</span>
                 <span className="font-bold text-gray-900">
-                  {orderData.paymentMethod === 'COD'
+                  {orderData?.payment?.method === 'cod'
                     ? 'Thanh toán khi nhận hàng'
-                    : orderData.paymentMethod}
+                    : orderData?.payment?.method === 'bank'
+                    ? 'Chuyển khoản ngân hàng'
+                    : orderData?.payment?.method === 'momo'
+                    ? 'MOMO'
+                    : 'Khác'}
                 </span>
               </div>
             </div>
 
-            {/* Support */}
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
@@ -558,9 +530,7 @@ export function TrackOrderPage() {
                 <h3 className="font-bold text-gray-900">Cần hỗ trợ?</h3>
               </div>
 
-              <p className="text-sm text-gray-600 mb-4">
-                Liên hệ với chúng tôi nếu bạn cần hỗ trợ về đơn hàng
-              </p>
+              <p className="text-sm text-gray-600 mb-4">Liên hệ với chúng tôi nếu bạn cần hỗ trợ về đơn hàng</p>
 
               <div className="space-y-2">
                 <button className="w-full bg-white border border-blue-200 text-blue-700 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
@@ -574,7 +544,6 @@ export function TrackOrderPage() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="space-y-3">
               <button className="w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
                 <Download className="w-4 h-4" />

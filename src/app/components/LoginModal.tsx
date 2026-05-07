@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { X, Mail, Lock, User as UserIcon, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,6 +10,7 @@ interface LoginModalProps {
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { login, register } = useAuth();
+  const navigate = useNavigate();
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,12 +38,15 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           setIsLoading(false);
           return;
         }
-        await login(email, password);
+        const loggedInUser = await login(email, password);
         // Reset form and close modal on success
         setName('');
         setEmail('');
         setPassword('');
         onClose();
+        if (loggedInUser.role === 'admin') {
+          navigate('/admin');
+        }
       } else {
         if (!name || !email || !password) {
           setError('Vui lòng điền đầy đủ thông tin');
